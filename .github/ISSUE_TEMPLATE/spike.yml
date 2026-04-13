@@ -1,0 +1,47 @@
+name: Spike / Research
+description: Investigation or research task — output is a decision or recommendation, not code
+labels: ["spike"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question to Answer
+      description: What are we trying to learn or decide?
+      placeholder: "Should we use Stripe or Lemon Squeezy for payments?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints & Context
+      description: What factors should the recommendation consider?
+      placeholder: |
+        - Must support subscriptions
+        - Must work with Supabase Auth
+        - Budget < $50/mo at our scale
+
+  - type: textarea
+    id: deliverable
+    attributes:
+      label: Expected Deliverable
+      description: What should the output of this spike look like?
+      value: |
+        - [ ] Written recommendation (as a comment on this issue)
+        - [ ] Comparison of options considered
+        - [ ] Recommended next step
+    validations:
+      required: true
+
+  - type: dropdown
+    id: timebox
+    attributes:
+      label: Timebox
+      description: How long should be spent on this before reporting findings?
+      options:
+        - "1 hour"
+        - "Half day"
+        - "1 day"
+        - "2 days"
+    validations:
+      required: true

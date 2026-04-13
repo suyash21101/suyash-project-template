@@ -1,0 +1,53 @@
+name: Chore
+description: Tech debt, infrastructure, refactoring, or maintenance work
+labels: ["chore"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What needs to be done
+      description: Describe the work. Be specific about files, configs, or systems involved.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why
+      description: Why is this worth doing now? What breaks or degrades if we don't?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size Estimate
+      options:
+        - "XS"
+        - "S"
+        - "M"
+        - "L"
+        - "XL"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent-compatible
+    attributes:
+      label: Can a Claude agent do this independently?
+      options:
+        - "Yes — fully specified"
+        - "Needs clarification first"
+        - "No — requires human judgment"
+    validations:
+      required: true

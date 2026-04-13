@@ -1,0 +1,85 @@
+name: Dependency Audit
+
+on:
+  schedule:
+    # Every Sunday at midnight UTC
+    - cron: "0 0 * * 0"
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run npm audit
+        id: audit
+        continue-on-error: true
+        run: |
+          npm audit --production 2>&1 | tee audit-output.txt
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Check for outdated packages
+        id: outdated
+        continue-on-error: true
+        run: |
+          npm outdated 2>&1 | tee outdated-output.txt || true
+
+      - name: Create issue if vulnerabilities found
+        if: steps.audit.outputs.exit_code != '0'
+        run: |
+          AUDIT_BODY=$(cat audit-output.txt | head -100)
+          OUTDATED_BODY=$(cat outdated-output.txt | head -50)
+
+          gh issue create \
+            --title "Security: dependency vulnerabilities found ($(date +%Y-%m-%d))" \
+            --label "chore,priority/p1,area/infra" \
+            --body "$(cat <<EOF
+          ## npm audit found vulnerabilities
+
+          \`\`\`
+          ${AUDIT_BODY}
+          \`\`\`
+
+          ## Outdated packages
+
+          \`\`\`
+          ${OUTDATED_BODY}
+          \`\`\`
+
+          ## Action needed
+          - [ ] Review vulnerabilities above
+          - [ ] Run \`npm audit fix\` for auto-fixable issues
+          - [ ] Manually update packages with breaking changes
+          - [ ] Verify build passes after updates
+
+          _This issue was created automatically by the dependency audit workflow._
+          EOF
+          )"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Dependency Audit" >> "$GITHUB_STEP_SUMMARY"
+          echo "Date: $(date -u)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.audit.outputs.exit_code }}" = "0" ]; then
+            echo "Result: No vulnerabilities found" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Result: Vulnerabilities found — issue created" >> "$GITHUB_STEP_SUMMARY"
+          fi

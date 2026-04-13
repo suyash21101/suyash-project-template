@@ -1,0 +1,76 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: ["bug"]
+body:
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Numbered steps to trigger the bug.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happens. Include screenshots or error messages if available.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Which files or components are involved? Include file paths.
+      placeholder: |
+        - Middleware: `src/middleware.ts`
+        - Auth check: `src/lib/supabase/middleware.ts`
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: How do we verify the fix works?
+      value: |
+        - [ ] Bug no longer reproduces following the steps above
+        - [ ]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - "P0 — App is broken / data loss"
+        - "P1 — Major feature broken, no workaround"
+        - "P2 — Feature broken, workaround exists"
+        - "P3 — Minor / cosmetic"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent-compatible
+    attributes:
+      label: Can a Claude agent fix this independently?
+      options:
+        - "Yes — fully specified"
+        - "Needs clarification first"
+        - "No — requires human judgment"
+    validations:
+      required: true

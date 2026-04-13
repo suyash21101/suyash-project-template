@@ -1,0 +1,64 @@
+name: Claude Regression Check
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [develop, staging, main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+
+jobs:
+  regression:
+    name: Claude Regression Check
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: sonnet
+          timeout_minutes: 10
+          prompt: |
+            You are a QA engineer performing regression analysis on this PR.
+
+            ## Your Job
+            Analyze the diff and determine what existing functionality is at risk of breaking.
+            This is NOT a code review — the PR reviewer handles that.
+            Your focus is: "What could this change break that already works?"
+
+            ## Process
+            1. Read the diff to understand what changed
+            2. Map each change to the features it affects:
+               - Auth changes → login, logout, session, protected routes
+               - Component changes → every page that uses that component
+               - API route changes → every client that calls that endpoint
+               - Middleware changes → every route that passes through it
+               - Database/Prisma changes → every query that touches those models
+               - CSS/styling changes → visual regression across pages
+               - lib/ utility changes → every file that imports from lib/
+            3. Check if tests exist for the affected areas
+            4. Identify gaps — what is at risk but has NO test coverage?
+
+            ## Output Format
+
+            ### Impact Map
+            List each changed file and what features it affects.
+
+            ### Covered by Tests
+            List affected areas that DO have test coverage (with test file paths).
+
+            ### Regression Risk (NOT Covered)
+            List affected areas with NO test coverage. Rate risk: HIGH, MEDIUM, LOW.
+
+            ### Recommended Test Cases
+            Suggest specific test cases that should be added to cover the gaps.
+            Be concrete — name the function, the scenario, and the expected behavior.
+
+            If the change is trivial (typo fix, comment-only, config-only), say so and skip the full analysis.

@@ -1,0 +1,67 @@
+name: Stale PR Check
+
+on:
+  schedule:
+    # Every weekday at 9am UTC
+    - cron: "0 9 * * 1-5"
+
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  stale:
+    name: Check Stale PRs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Flag stale PRs
+        run: |
+          # Get PRs open more than 3 days
+          STALE_PRS=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --json number,title,author,createdAt,updatedAt \
+            --jq '[.[] | select(
+              (now - (.updatedAt | fromdateiso8601)) > (3 * 24 * 3600)
+            )]')
+
+          COUNT=$(echo "$STALE_PRS" | jq 'length')
+
+          if [ "$COUNT" -gt 0 ]; then
+            echo "Found $COUNT stale PR(s)"
+
+            echo "$STALE_PRS" | jq -c '.[]' | while read -r pr; do
+              PR_NUM=$(echo "$pr" | jq -r '.number')
+              PR_TITLE=$(echo "$pr" | jq -r '.title')
+              UPDATED=$(echo "$pr" | jq -r '.updatedAt')
+
+              echo "Commenting on PR #${PR_NUM}: ${PR_TITLE} (last updated: ${UPDATED})"
+
+              gh pr comment "$PR_NUM" \
+                --repo "${{ github.repository }}" \
+                --body "This PR has had no activity for 3+ days. Please review, update, or close if no longer needed."
+            done
+          else
+            echo "No stale PRs found"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Flag stuck issues
+        run: |
+          # Get issues labeled "in-progress" that haven't been updated in 5 days
+          # This checks issues with linked PRs that are stale
+          ISSUES=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --json number,title,updatedAt,labels \
+            --jq '[.[] | select(
+              (now - (.updatedAt | fromdateiso8601)) > (5 * 24 * 3600)
+            )] | .[0:10]')
+
+          COUNT=$(echo "$ISSUES" | jq 'length')
+          echo "Found $COUNT issue(s) with no activity in 5+ days"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

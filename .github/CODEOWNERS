@@ -1,0 +1,15 @@
+# Default owner for everything — replace with your GitHub username
+* @YOUR_GITHUB_USERNAME
+
+# Auth and security-sensitive code — always require review
+src/middleware.ts @YOUR_GITHUB_USERNAME
+src/lib/supabase/ @YOUR_GITHUB_USERNAME
+src/app/auth/ @YOUR_GITHUB_USERNAME
+src/lib/session.ts @YOUR_GITHUB_USERNAME
+
+# Database schema changes — always require review
+prisma/ @YOUR_GITHUB_USERNAME
+sql/ @YOUR_GITHUB_USERNAME
+
+# CI/CD pipeline changes — always require review
+.github/ @YOUR_GITHUB_USERNAME

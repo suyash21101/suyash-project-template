@@ -1,0 +1,45 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+
+jobs:
+  review:
+    name: Claude PR Review
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: sonnet
+          timeout_minutes: 10
+          prompt: |
+            You are a senior code reviewer. Review this PR for code quality.
+
+            ## Review Criteria
+            1. **Correctness** — Are there logic errors, off-by-one bugs, race conditions, or unhandled edge cases?
+            2. **Conventions** — Does the code follow the project conventions defined in CLAUDE.md?
+            3. **Component patterns** — Are React components structured consistently with existing ones in src/components/?
+            4. **Performance** — Are there unnecessary re-renders, missing keys, N+1 queries, or heavy computations in render paths?
+            5. **Type safety** — Are TypeScript types used correctly? Any unsafe `any` casts or missing types?
+            6. **Error handling** — Are errors handled at system boundaries (API routes, form submissions, external calls)?
+
+            ## Rules
+            - Be concise. Only comment on things that actually matter.
+            - Do NOT nitpick formatting or style — the linter handles that.
+            - Do NOT suggest adding comments, docstrings, or type annotations to unchanged code.
+            - Do NOT suggest adding error handling for impossible scenarios.
+            - If the code is good, say so briefly. Don't manufacture feedback.
+            - Use inline PR comments on specific lines when possible.
+            - Rate the PR: APPROVE, REQUEST_CHANGES, or COMMENT.

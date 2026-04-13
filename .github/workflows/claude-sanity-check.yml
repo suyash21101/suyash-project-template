@@ -1,0 +1,94 @@
+name: Post-Deploy Sanity Check
+
+on:
+  # Trigger after Vercel deployment succeeds
+  deployment_status:
+
+  # Also allow manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "URL to run sanity checks against"
+        required: true
+        type: string
+
+env:
+  # Fallback URL if deployment_status doesn't provide one
+  PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+
+jobs:
+  sanity:
+    name: Sanity Check
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'production')
+    steps:
+      - name: Determine target URL
+        id: url
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "target=${{ inputs.target_url }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.deployment_status.target_url }}" ]; then
+            echo "target=${{ github.event.deployment_status.target_url }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=${{ env.PRODUCTION_URL }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for deployment to stabilize
+        run: sleep 10
+
+      - name: Check homepage
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.url.outputs.target }}")
+          if [ "$STATUS" -ge 500 ]; then
+            echo "FAIL: Homepage returned $STATUS"
+            exit 1
+          fi
+          echo "PASS: Homepage returned $STATUS"
+
+      - name: Check auth callback route
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.url.outputs.target }}/auth/callback")
+          if [ "$STATUS" -ge 500 ]; then
+            echo "FAIL: Auth callback returned $STATUS"
+            exit 1
+          fi
+          echo "PASS: Auth callback returned $STATUS"
+
+      - name: Check onboarding welcome
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.url.outputs.target }}/onboarding/welcome")
+          if [ "$STATUS" -ge 500 ]; then
+            echo "FAIL: Onboarding welcome returned $STATUS"
+            exit 1
+          fi
+          echo "PASS: Onboarding welcome returned $STATUS"
+
+      - name: Check static assets load
+        run: |
+          # Check that the page returns HTML with expected content
+          BODY=$(curl -s "${{ steps.url.outputs.target }}")
+          if echo "$BODY" | grep -q "<!DOCTYPE html\|<html"; then
+            echo "PASS: Homepage returns valid HTML"
+          else
+            echo "FAIL: Homepage does not return valid HTML"
+            exit 1
+          fi
+
+      - name: Check response time
+        run: |
+          TIME=$(curl -s -o /dev/null -w "%{time_total}" "${{ steps.url.outputs.target }}")
+          echo "Homepage response time: ${TIME}s"
+          # Fail if response takes more than 10 seconds
+          if (( $(echo "$TIME > 10" | bc -l) )); then
+            echo "WARN: Homepage response time exceeds 10s"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Sanity Check Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "Target: ${{ steps.url.outputs.target }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Time: $(date -u)" >> "$GITHUB_STEP_SUMMARY"

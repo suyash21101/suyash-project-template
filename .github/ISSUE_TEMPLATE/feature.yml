@@ -1,0 +1,79 @@
+name: Feature Story
+description: A feature story for the sprint board
+labels: ["feature"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Which part of the app does this touch? Name specific files or directories.
+      placeholder: |
+        The onboarding flow lives in `src/app/onboarding/`.
+        The login page is `src/app/page.tsx`.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Testable checkboxes. Be specific — these define "done."
+      value: |
+        - [ ]
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical-notes
+    attributes:
+      label: Technical Notes
+      description: Patterns to follow, libraries to use, constraints, relevant existing code.
+      placeholder: |
+        - Use `@supabase/ssr` for server-side auth
+        - Follow component patterns in `src/components/`
+        - Use Material Design 3 color tokens from `globals.css`
+
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of Scope
+      description: What this story explicitly does NOT include. Prevents agent over-building.
+      placeholder: |
+        - Apple OAuth (separate story)
+        - Error monitoring integration
+
+  - type: textarea
+    id: design-reference
+    attributes:
+      label: Design Reference
+      description: Figma links, screenshot paths, or text descriptions of expected UI.
+      placeholder: |
+        See `Screens for onboarding/login.png`
+        Or: Figma link here
+
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size Estimate
+      options:
+        - "XS — trivial change, < 30 min"
+        - "S — small, 1-2 hours"
+        - "M — medium, half day"
+        - "L — large, full day"
+        - "XL — epic, multi-day (consider splitting)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent-compatible
+    attributes:
+      label: Can a Claude agent implement this independently?
+      description: "Yes" means the story has enough context for an agent to work without asking questions.
+      options:
+        - "Yes — fully specified"
+        - "Needs clarification first"
+        - "No — requires human judgment"
+    validations:
+      required: true

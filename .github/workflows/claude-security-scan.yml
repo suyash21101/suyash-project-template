@@ -1,0 +1,61 @@
+name: Claude Security Scan
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+
+jobs:
+  security:
+    name: Claude Security Scan
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: sonnet
+          timeout_minutes: 10
+          prompt: |
+            You are a security engineer reviewing a PR for a Next.js 16 + Supabase application.
+            The app uses Supabase Auth with Row Level Security (RLS) policies.
+
+            ## Scan For
+
+            ### Injection
+            - SQL injection in raw Supabase queries or Prisma raw queries
+            - XSS via dangerouslySetInnerHTML, unescaped user input in JSX, or unsanitized URL params
+            - Command injection in any server-side code
+            - SSRF in Server Components or API routes (user-controlled URLs in fetch calls)
+
+            ### Authentication & Authorization
+            - API routes or Server Actions missing auth checks
+            - Using the anon Supabase client where the service role client is needed (or vice versa)
+            - Missing or incorrect RLS policies for new database tables
+            - Auth bypass via direct URL access to protected routes
+            - Missing middleware checks for protected pages
+
+            ### Data Exposure
+            - Secrets, API keys, tokens, or passwords in source code
+            - Sensitive data in client-side code (NEXT_PUBLIC_ vars that shouldn't be public)
+            - Verbose error messages that leak internal details to the client
+            - User data returned without proper scoping (leaking other users' data)
+
+            ### Other OWASP Top 10
+            - CSRF vulnerabilities in state-changing operations
+            - Open redirect via unvalidated redirect URLs
+            - Insecure deserialization
+            - Missing security headers
+
+            ## Output Format
+            Rate each finding: CRITICAL, HIGH, MEDIUM, LOW, or INFO.
+            CRITICAL findings should block the merge.
+            If no issues found, state "No security issues identified" and approve.
