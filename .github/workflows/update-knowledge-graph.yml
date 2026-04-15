@@ -1,0 +1,36 @@
+name: Update Knowledge Graph
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-graph:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: sonnet
+          prompt: |
+            Run /graphify . --update to refresh the knowledge graph
+            with the latest code changes.
+
+      - name: Commit graph updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet graphify-out/ 2>/dev/null; then
+            echo "No graph changes to commit"
+          else
+            git add graphify-out/
+            git commit -m "chore: update knowledge graph [skip ci]"
+            git push
+          fi
