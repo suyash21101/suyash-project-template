@@ -15,10 +15,12 @@
 6. [Story Writing Guide for Agent Compatibility](#6-story-writing-guide-for-agent-compatibility)
 7. [Branch Protection Rules](#7-branch-protection-rules)
 8. [Environment Setup (Supabase + Vercel)](#8-environment-setup-supabase--vercel)
-9. [Template Repository Setup](#9-template-repository-setup)
-10. [New Project Bootstrap (From Template)](#10-new-project-bootstrap-from-template)
-11. [Cost Breakdown](#11-cost-breakdown)
-12. [Effectiveness Assessment](#12-effectiveness-assessment)
+9. [Knowledge Layer — Graphify](#9-knowledge-layer--graphify)
+10. [Stateful Agent Layer — Archon (Future)](#10-stateful-agent-layer--archon-future)
+11. [Template Repository Setup](#11-template-repository-setup)
+12. [New Project Bootstrap (From Template)](#12-new-project-bootstrap-from-template)
+13. [Cost Breakdown](#13-cost-breakdown)
+14. [Effectiveness Assessment](#14-effectiveness-assessment)
 
 ---
 
@@ -938,7 +940,274 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ---
 
-## 9. Template Repository Setup
+## 9. Knowledge Layer — Graphify
+
+### The Problem: Claude's Context Window Is Expensive
+
+Every Claude Code session starts fresh. Each agent run (PR review, developer agent, regression tester) re-reads the same files, re-discovers the same architecture, re-learns the same conventions. This burns tokens, costs money, and limits how much an agent can do in a single run.
+
+**Graphify solves this** by extracting a persistent, queryable knowledge graph from your codebase. Instead of agents reading 50 files to understand how auth works, they query the graph: "What depends on the auth middleware?" and get a precise answer in a fraction of the tokens.
+
+### What Graphify Is
+
+Graphify is a Claude Code skill that transforms any input (code, docs, papers, images) into a navigable knowledge graph.
+
+**Outputs:**
+| File | Purpose |
+|---|---|
+| `graphify-out/graph.html` | Interactive browser visualization — explore nodes, clusters, connections |
+| `graphify-out/GRAPH_REPORT.md` | Audit trail with insights, god nodes, surprising connections |
+| `graphify-out/graph.json` | Machine-readable graph (GraphRAG-ready) |
+
+### How To Use It
+
+#### Initial Graph Generation (Run Once Per Project)
+
+```bash
+# From your project root
+claude "/graphify . --mode deep"
+```
+
+This reads your entire codebase and builds the knowledge graph. Takes a few minutes depending on project size.
+
+#### Incremental Updates (Run After Merges)
+
+```bash
+# After merging a PR or significant changes
+claude "/graphify . --update"
+```
+
+Only processes changed files. Fast and cheap.
+
+#### Querying the Graph (Use Instead of Reading Files)
+
+```bash
+# Ask a question about architecture
+claude "/graphify query 'What components depend on Supabase auth?'"
+
+# Find the shortest path between two concepts
+claude "/graphify path 'LoginPage' 'SupabaseClient'"
+
+# BFS/DFS exploration
+claude "/graphify query 'What does the onboarding flow touch?' --mode bfs"
+```
+
+### Integration With the Pipeline
+
+#### Where Graphify Fits
+
+```
+PR merges to develop
+    │
+    ▼
+CI passes
+    │
+    ▼
+graphify --update          ← Rebuild graph with new code
+    │
+    ▼
+graph.json updated         ← Agents use this on next run
+```
+
+#### How Agents Use the Graph
+
+Instead of giving agents free rein to explore the codebase (expensive, slow, often wrong), point them at the graph:
+
+**In agent prompts, add:**
+```
+Before implementing, check the knowledge graph at graphify-out/GRAPH_REPORT.md
+for architecture context. Query graphify-out/graph.json for dependency relationships.
+```
+
+**Concrete savings:**
+| Without Graphify | With Graphify |
+|---|---|
+| Developer agent reads 30-50 files to understand context (~15k-40k tokens) | Agent reads graph report + targeted query (~3k-5k tokens) |
+| PR reviewer re-discovers architecture every run | Reviewer knows the dependency map from the graph |
+| Regression tester guesses what might break | Tester queries the graph for downstream dependencies |
+
+#### Automated Graph Updates (GitHub Action)
+
+Add to your CI pipeline to keep the graph fresh:
+
+```yaml
+# .github/workflows/update-knowledge-graph.yml
+name: Update Knowledge Graph
+on:
+  push:
+    branches: [develop]
+
+jobs:
+  update-graph:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Run /graphify . --update to refresh the knowledge graph
+            with the latest code changes. Commit the updated graph
+            files if there are changes.
+```
+
+#### Add to CLAUDE.md
+
+Add this block to your project's CLAUDE.md so all agents know about the graph:
+
+```markdown
+## Knowledge Graph
+A Graphify knowledge graph is maintained at `graphify-out/`.
+- For architecture questions, read `graphify-out/GRAPH_REPORT.md` first
+- For dependency lookups, query `graphify-out/graph.json`
+- Do NOT re-read entire directories when the graph can answer your question
+```
+
+### What to Commit
+
+```
+graphify-out/
+  ├── graph.json          ✅ Commit (agents need this)
+  ├── GRAPH_REPORT.md     ✅ Commit (agents and humans need this)
+  └── graph.html          ⚠️ Optional (useful for manual exploration, ~1-3MB)
+```
+
+### Template Repo Changes
+
+Add to the template so every new project gets Graphify wired in:
+
+1. Add `graphify-out/` to the repo structure
+2. Add the `update-knowledge-graph.yml` workflow
+3. Add the Knowledge Graph section to CLAUDE.md template
+4. Add `/graphify . --mode deep` to the setup script's post-bootstrap steps
+
+---
+
+## 10. Stateful Agent Layer — Archon (Future)
+
+> **Status: Planned — do NOT implement until the basic pipeline is validated and you hit real limitations of stateless agents.**
+
+### What Archon Is
+
+[Archon](https://github.com/coleam00/archon) by Cole Medin is an open-source AI agent framework that provides:
+
+- **Persistent memory** via Supabase vector storage
+- **Multi-agent orchestration** with handoffs between agents
+- **MCP integration** for tool access
+- **Self-hosted agent runtime** — agents run on your infrastructure, not limited to GitHub Actions' 6-hour ceiling
+
+### Why Not Now
+
+| Concern | Detail |
+|---|---|
+| **Complexity** | Adds hosting (Docker/VPS), Supabase vector config, agent runtime management |
+| **Cost** | VPS hosting ($5-20/mo) + same LLM costs + engineering time to set up |
+| **Diminishing returns early on** | Your current pipeline is stateless and that's fine for <50 stories |
+| **Dependency risk** | Archon is evolving rapidly; locking in now means churn later |
+
+### When to Adopt Archon
+
+Trigger any **two** of these conditions:
+
+- [ ] Agents repeatedly fail because they lack context from previous runs (same bug patterns, same architectural misunderstandings)
+- [ ] You need agents that work longer than 6 hours (GitHub Actions limit)
+- [ ] You want agents to autonomously pick up stories from the board without manual triggering
+- [ ] You have multiple projects where agents need shared knowledge (cross-repo memory)
+- [ ] You need agent-to-agent handoffs (e.g., developer agent hands off to test writer agent within a single workflow)
+
+### How It Will Integrate
+
+#### Architecture: Graphify + Archon = Two Memory Layers
+
+```
+┌─────────────────────────────────────────────────┐
+│                  Agent Request                   │
+│         "Implement story #42"                    │
+└────────────────────┬────────────────────────────┘
+                     │
+          ┌──────────┴──────────┐
+          ▼                     ▼
+┌─────────────────┐   ┌─────────────────────┐
+│   Graphify       │   │   Archon Memory      │
+│   (Structural)   │   │   (Semantic)          │
+│                  │   │                       │
+│ • What calls     │   │ • Past decisions      │
+│   what           │   │ • Resolved bugs       │
+│ • Dependencies   │   │ • Design rationale    │
+│ • File map       │   │ • Sprint context      │
+│ • Component      │   │ • "We tried X, it     │
+│   relationships  │   │    failed because Y"  │
+└─────────────────┘   └─────────────────────┘
+          │                     │
+          └──────────┬──────────┘
+                     ▼
+          ┌─────────────────────┐
+          │  Agent has full     │
+          │  context without    │
+          │  re-reading the     │
+          │  entire codebase    │
+          └─────────────────────┘
+```
+
+- **Graphify** = structural memory (what calls what, file dependencies, component relationships). Extracted from code. Updated after merges.
+- **Archon's Supabase vectors** = semantic memory (past decisions, resolved bugs, design rationale, sprint context). Accumulated over time from agent runs.
+
+#### Phased Rollout
+
+**Phase A — Validate the pipeline (NOW):**
+- Use stateless GHA agents + Graphify for structural context
+- Manually run `/graphify --update` after significant merges
+- Automate graph updates via the CI workflow above
+- This gives you ~80% of the memory benefit with zero extra infrastructure
+
+**Phase B — Add Archon when triggered (FUTURE):**
+
+1. **Set up Archon runtime:**
+   ```
+   # Self-hosted on a VPS or Docker
+   archon/
+     ├── docker-compose.yml
+     ├── agents/
+     │   ├── developer.py
+     │   ├── reviewer.py
+     │   └── orchestrator.py
+     └── .env  # Supabase + Anthropic credentials
+   ```
+
+2. **Migrate agents one at a time:**
+   - Start with the Developer Agent (highest value from persistent memory)
+   - Keep PR Reviewer and Security Scanner on stateless GHA (they don't need memory)
+   - Move Regression Tester to Archon (benefits from knowing past regressions)
+
+3. **Wire up the memory layer:**
+   - Archon agents read `graphify-out/graph.json` for structural context (replaces file exploration)
+   - Archon stores semantic memories in Supabase vectors (decisions, past bugs, rationale)
+   - Each agent run starts by querying both layers before doing any work
+
+4. **Enable autonomous story pickup:**
+   - Archon agent polls the sprint board for `claude-ready` issues
+   - Picks up stories, implements them, opens PRs
+   - No more manual `claude "Implement #42"` — the agent does it on its own schedule
+
+### Cost Impact
+
+| Item | Current (Stateless) | With Archon |
+|---|---|---|
+| Agent LLM costs | Same | Same |
+| VPS for Archon runtime | $0 | $5-20/mo |
+| Supabase vector storage | $0 (included in Pro plan) | $0 |
+| Setup time | 0 | ~1-2 days |
+| **Net benefit** | — | Agents make fewer mistakes, work autonomously, remember past context |
+
+### What NOT to Do
+
+- **Don't run Archon and GHA agents in parallel for the same task.** Pick one runtime per agent type.
+- **Don't store code in Archon's vector memory.** That's what Graphify and git are for. Archon stores *decisions and context*, not *code*.
+- **Don't skip Graphify.** Archon's semantic memory complements Graphify's structural memory — they're not interchangeable. You need both when you adopt Archon.
+
+---
+
+## 11. Template Repository Setup
 
 ### One-Time Setup (Do This Once)
 
@@ -1019,12 +1288,13 @@ echo "  2. Run your SQL migrations on each"
 echo "  3. Configure Vercel environment variables per branch"
 echo "  4. Add ANTHROPIC_API_KEY to GitHub repo secrets"
 echo "  5. Update CLAUDE.md with project-specific details"
-echo "  6. Create your first sprint stories"
+echo "  6. Run: claude '/graphify . --mode deep' to generate initial knowledge graph"
+echo "  7. Create your first sprint stories"
 ```
 
 ---
 
-## 10. New Project Bootstrap (From Template)
+## 12. New Project Bootstrap (From Template)
 
 ### Step-by-Step for Every New Project
 
@@ -1057,7 +1327,7 @@ gh secret set ANTHROPIC_API_KEY
 
 ---
 
-## 11. Cost Breakdown
+## 13. Cost Breakdown
 
 ### Monthly Costs (Active Development)
 
@@ -1072,8 +1342,11 @@ gh secret set ANTHROPIC_API_KEY
 | **Claude API (Regression)** | $10–20 | ~30 PRs/mo × $0.30–0.60 avg |
 | **Claude API (Sanity + Cron agents)** | $5–15 | Low frequency, small prompts |
 | **Claude API (Developer Agent)** | $20–50 | Depends on how many stories you delegate |
+| **Graphify graph updates** | $2–5 | ~$0.05–0.10 per incremental update, runs on merge to develop |
+| **Archon VPS (future)** | $0 (now) / $5–20 (later) | Only when you adopt Archon for stateful agents |
 | **Domain + DNS** | $12–15 | Annual, amortized |
-| **Total** | **$220–370/mo** | |
+| **Total (now)** | **$222–375/mo** | |
+| **Total (with Archon, future)** | **$227–395/mo** | |
 
 ### Comparison
 
@@ -1085,7 +1358,7 @@ gh secret set ANTHROPIC_API_KEY
 
 ---
 
-## 12. Effectiveness Assessment
+## 14. Effectiveness Assessment
 
 ### What Works Well Today
 
@@ -1096,6 +1369,8 @@ gh secret set ANTHROPIC_API_KEY
 | **Story implementation** | Good, needs oversight | Agent implements ~80% of well-groomed stories correctly. Remaining 20% needs human revision |
 | **Test writing** | Good | Generates reasonable unit tests. Integration tests need more guidance |
 | **CI/CD pipeline** | Industry standard | GitHub Actions is battle-tested, nothing experimental here |
+| **Graphify knowledge graph** | Use now | Reduces agent token burn by 60-80% on architecture queries. Run `--update` after merges |
+| **Archon stateful agents** | Planned (future) | Adopt when stateless agents hit real memory/autonomy limits |
 
 ### What Requires Human Judgment
 
@@ -1131,4 +1406,11 @@ View sprint board:       gh project view --owner <you>
 Deploy to staging:       Open PR: develop → staging
 Deploy to prod:          Open PR: staging → main
 Post-deploy check:       Automatic (sanity check workflow)
+
+Knowledge graph:
+  Initial build:         claude "/graphify . --mode deep"
+  Update after merge:    claude "/graphify . --update"
+  Query architecture:    claude "/graphify query 'What depends on auth?'"
+  Find connections:      claude "/graphify path 'ComponentA' 'ComponentB'"
+  View graph:            open graphify-out/graph.html
 ```
