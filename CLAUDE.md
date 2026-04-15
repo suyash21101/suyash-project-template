@@ -45,6 +45,13 @@ src/
 ## Design Reference
 <!-- Link to Figma, screenshot directories, or design system docs -->
 
+## Knowledge Graph
+A Graphify knowledge graph is maintained at `graphify-out/`.
+- For architecture questions, read `graphify-out/GRAPH_REPORT.md` first
+- For dependency lookups, query `graphify-out/graph.json`
+- Do NOT re-read entire directories when the graph can answer your question
+- The graph is auto-updated on merge to develop via CI
+
 ## Git Workflow
 - Never commit directly to `main`, `staging`, or `develop`
 - Create feature branches: `feature/<issue-number>-<short-description>`
