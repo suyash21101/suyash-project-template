@@ -23,3 +23,9 @@
 - Check OWASP Top 10 categories
 - Pay special attention to auth flows and database queries
 - Rate findings by severity: CRITICAL, HIGH, MEDIUM, LOW, INFO
+
+## Using the Knowledge Graph (All Agents)
+- Before exploring the codebase, check `graphify-out/GRAPH_REPORT.md` for architecture context
+- Query `graphify-out/graph.json` for dependency relationships instead of reading dozens of files
+- This saves tokens and gives you a more accurate picture of the codebase structure
+- If the graph is outdated (check the commit date), fall back to reading files directly
