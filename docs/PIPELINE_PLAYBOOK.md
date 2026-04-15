@@ -29,11 +29,11 @@
 
 ### Repos You Will Have
 
-| Repo | Purpose | Template? |
-|---|---|---|
+| Repo                      | Purpose                                                                                                                                                       | Template?             |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | `suyash-project-template` | The reusable template. Contains all CI/CD workflows, issue templates, PR templates, setup scripts, base CLAUDE.md. You never deploy this — you clone from it. | Yes (GitHub Template) |
-| `CollegeOra-frontend` | The Next.js application. All product code, tests, Prisma schema, Supabase config. This is your deployable project. | Created from template |
-| Future projects | Any new project you start. Created from the template in one click. Inherits all pipeline config. | Created from template |
+| `CollegeOra-frontend`     | The Next.js application. All product code, tests, Prisma schema, Supabase config. This is your deployable project.                                            | Created from template |
+| Future projects           | Any new project you start. Created from the template in one click. Inherits all pipeline config.                                                              | Created from template |
 
 ### Why Not More Repos?
 
@@ -115,11 +115,11 @@ Production
 
 ### Three Environments
 
-| Environment | Branch | Vercel Deployment | Database | Purpose |
-|---|---|---|---|---|
-| **INT** | `develop` | Auto preview deploy | Supabase Project: `collegeora-int` | Integration. Features land here first. Unstable is OK. |
-| **UAT** | `staging` | Auto preview deploy | Supabase Project: `collegeora-uat` | User acceptance testing. Stable. Mirrors prod schema. |
-| **PROD** | `main` | Production deploy | Supabase Project: `collegeora-prod` | Live. Only tested, reviewed code reaches here. |
+| Environment | Branch    | Vercel Deployment   | Database                            | Purpose                                                |
+| ----------- | --------- | ------------------- | ----------------------------------- | ------------------------------------------------------ |
+| **INT**     | `develop` | Auto preview deploy | Supabase Project: `collegeora-int`  | Integration. Features land here first. Unstable is OK. |
+| **UAT**     | `staging` | Auto preview deploy | Supabase Project: `collegeora-uat`  | User acceptance testing. Stable. Mirrors prod schema.  |
+| **PROD**    | `main`    | Production deploy   | Supabase Project: `collegeora-prod` | Live. Only tested, reviewed code reaches here.         |
 
 ### Database Parity
 
@@ -139,19 +139,16 @@ All three Supabase projects must have identical schemas. Enforce this by:
 #### On Every PR (to any protected branch)
 
 ```yaml
-ci.yml:
-  ├── Lint (ESLint)
+ci.yml: ├── Lint (ESLint)
   ├── Type Check (tsc --noEmit)
   ├── Unit Tests (Vitest)
   ├── Build Check (next build)
   ├── Prisma Validate (prisma validate)
   └── Bundle Size Check (report delta vs base branch)
 
-claude-pr-review.yml:
-  └── Claude PR Reviewer (code quality, patterns, conventions)
+claude-pr-review.yml: └── Claude PR Reviewer (code quality, patterns, conventions)
 
-claude-security-scan.yml:
-  └── Claude Security Engineer (OWASP, injection, auth bypass, secrets)
+claude-security-scan.yml: └── Claude Security Engineer (OWASP, injection, auth bypass, secrets)
 ```
 
 #### On PR to `develop`
@@ -161,7 +158,7 @@ All of the above, plus:
 ```yaml
 claude-regression-check.yml:
   └── Claude Regression Tester (analyzes what changed, identifies
-      what existing functionality could break, runs targeted tests)
+  what existing functionality could break, runs targeted tests)
 ```
 
 #### On PR to `staging`
@@ -169,8 +166,8 @@ claude-regression-check.yml:
 All of the above, plus:
 
 ```yaml
-  ├── Integration Tests (Vitest, hitting INT database)
-  └── E2E Tests (Playwright, against UAT preview deploy)
+├── Integration Tests (Vitest, hitting INT database)
+└── E2E Tests (Playwright, against UAT preview deploy)
 ```
 
 #### On PR to `main`
@@ -178,8 +175,8 @@ All of the above, plus:
 All of the above, plus:
 
 ```yaml
-  ├── Full E2E Suite (Playwright, against staging URL)
-  └── Manual approval gate (GitHub Environment protection rule)
+├── Full E2E Suite (Playwright, against staging URL)
+└── Manual approval gate (GitHub Environment protection rule)
 ```
 
 #### Post-Deploy to Production
@@ -187,17 +184,15 @@ All of the above, plus:
 ```yaml
 claude-sanity-check.yml:
   └── Claude Sanity Agent (hits production URL, verifies critical
-      user paths are working, reports pass/fail to Slack or GitHub)
+  user paths are working, reports pass/fail to Slack or GitHub)
 ```
 
 #### Scheduled (Cron)
 
 ```yaml
-dependency-audit.yml (weekly):
-  └── npm audit + Snyk/Socket scan, opens issue if vulnerabilities found
+dependency-audit.yml (weekly): └── npm audit + Snyk/Socket scan, opens issue if vulnerabilities found
 
-stale-pr-check.yml (daily):
-  └── Flags PRs open > 3 days, pings author
+stale-pr-check.yml (daily): └── Flags PRs open > 3 days, pings author
 ```
 
 ---
@@ -206,23 +201,55 @@ stale-pr-check.yml (daily):
 
 ### Overview
 
-| # | Agent | Trigger | What It Does | Estimated Cost/Run |
-|---|---|---|---|---|
-| 1 | PR Reviewer | Every PR | Reviews code quality | $0.05–0.30 |
-| 2 | Security Engineer | Every PR | Scans for vulnerabilities | $0.05–0.20 |
-| 3 | Regression Tester | PR to develop+ | Identifies regression risk | $0.10–0.40 |
-| 4 | Sanity Checker | Post-deploy to prod | Verifies critical paths | $0.05–0.15 |
-| 5 | Dependency Auditor | Weekly cron | Scans for CVEs | $0.02–0.10 |
-| 6 | Developer Agent | Manual / label trigger | Implements stories | $0.50–5.00 |
-| 7 | Test Writer | Manual / scheduled | Writes missing tests | $0.20–1.00 |
-| 8 | Documentation Agent | Manual | Updates docs from code changes | $0.10–0.30 |
-| 9 | Stale Work Monitor | Daily cron | Flags stuck PRs, overdue issues | $0.02–0.05 |
-| 10 | Migration Safety Agent | PR with schema changes | Reviews DB migration safety | $0.10–0.30 |
+| #   | Agent                  | Where     | Trigger                | What It Does                    | API Cost/Run    |
+| --- | ---------------------- | --------- | ---------------------- | ------------------------------- | --------------- |
+| 1   | PR Reviewer            | CI        | Every PR               | Reviews code quality            | $0.05–0.30      |
+| 2   | Security Engineer      | CI        | Every PR               | Scans for vulnerabilities       | $0.05–0.20      |
+| 3   | Regression Tester      | CI        | PR to develop+         | Identifies regression risk      | $0.10–0.40      |
+| 4   | Sanity Checker         | CI        | Post-deploy to prod    | Verifies critical paths         | Free (curl)     |
+| 5   | Dependency Auditor     | CI        | Weekly cron            | Scans for CVEs                  | $0.02–0.10      |
+| 6   | Developer Agent        | **Local** | Manual                 | Implements stories              | Free (Max plan) |
+| 7   | Test Writer            | **Local** | Manual                 | Writes missing tests            | Free (Max plan) |
+| 8   | Documentation Agent    | **Local** | Manual                 | Updates docs from code changes  | Free (Max plan) |
+| 9   | Stale Work Monitor     | CI        | Daily cron             | Flags stuck PRs, overdue issues | $0.02–0.05      |
+| 10  | Migration Safety Agent | CI        | PR with schema changes | Reviews DB migration safety     | $0.10–0.30      |
+
+### Hybrid Execution Model
+
+Agents split into two tiers based on where they run:
+
+**CI Agents (API key, pay-per-token):** Lightweight, automated agents that trigger on events (PRs, deploys, cron). These are review/scan agents — they read diffs, post comments, and cost pennies per run. Agents 1–5, 9–10.
+
+**Local Agents (Max plan, effectively unlimited):** Heavy agents that do real development work — planning, implementing, testing, documenting. These are the most expensive if run on API ($0.50–5.00/run), but **free on a Claude Max/Pro subscription** via Claude Code CLI. Agents 6–8.
+
+**Why this split matters:**
+
+| Scenario                | API-only cost/month | Hybrid cost/month |
+| ----------------------- | ------------------- | ----------------- |
+| Solo dev, 20 PRs/month  | $25–60              | $5–15 (CI only)   |
+| Solo dev, 40 PRs/month  | $50–120             | $10–25 (CI only)  |
+| Team of 3, 60 PRs/month | $75–180             | $15–40 (CI only)  |
+
+The heaviest token consumers (Developer Agent, Test Writer) move to your local Max plan where they cost nothing extra. CI agents handle the automated quality gates.
+
+**Daily workflow (solo dev on Max plan):**
+
+```
+Morning:  Plan sprint / groom tickets    → Claude Code locally (free)
+Working:  Implement features              → Claude Code locally (free)
+Working:  Write & iterate on tests        → Claude Code locally (free)
+Push:     Open PR                         → CI agents fire ($0.20–0.50)
+Iterate:  Fix review feedback             → Claude Code locally (free)
+Merge:    Knowledge graph auto-updates    → CI ($0.05–0.10)
+```
+
+**Estimated monthly API spend for solo dev: $5–15/month.**
 
 ### Agent 1: PR Reviewer
 
 **Trigger:** `pull_request` opened/synchronized
 **Action:** Reviews the diff for:
+
 - Code quality and readability
 - Adherence to project conventions (from CLAUDE.md)
 - Component structure consistency
@@ -233,6 +260,7 @@ stale-pr-check.yml (daily):
 **Output:** Comments directly on the PR with inline suggestions.
 
 **GitHub Action config:**
+
 ```yaml
 name: Claude PR Review
 on:
@@ -253,7 +281,7 @@ jobs:
             2. Are there any logic errors or missed edge cases?
             3. Is the code unnecessarily complex?
             4. Are there any performance concerns?
-            
+
             Be concise. Only comment on things that matter.
             Do NOT nitpick style — the linter handles that.
             Do NOT suggest adding comments or docstrings unless
@@ -264,6 +292,7 @@ jobs:
 
 **Trigger:** `pull_request` opened/synchronized
 **Action:** Scans for:
+
 - SQL injection (especially raw Supabase queries)
 - XSS in React components (dangerouslySetInnerHTML, unescaped user input)
 - Auth bypass (missing middleware checks, exposed API routes)
@@ -277,6 +306,7 @@ jobs:
 **Output:** Security review comment. Blocks merge if severity = critical.
 
 **Prompt focus:**
+
 ```
 You are a security engineer reviewing a PR for a Next.js + Supabase app.
 The app uses Supabase Auth with RLS policies. Check:
@@ -293,6 +323,7 @@ Rate findings: CRITICAL (blocks merge), HIGH, MEDIUM, LOW, INFO.
 
 **Trigger:** PR to `develop`, `staging`, or `main`
 **Action:**
+
 1. Reads the diff to understand what changed
 2. Maps changes to affected features (e.g., "auth callback route changed" → "login flow may be affected")
 3. Identifies existing tests that cover the affected areas
@@ -300,9 +331,10 @@ Rate findings: CRITICAL (blocks merge), HIGH, MEDIUM, LOW, INFO.
 5. If test infrastructure exists, suggests specific test cases to add
 6. Runs existing test suite and reports results
 
-**This is different from the CI test run.** The CI runs all tests blindly. The regression agent *thinks* about what could break and whether the test suite actually covers it.
+**This is different from the CI test run.** The CI runs all tests blindly. The regression agent _thinks_ about what could break and whether the test suite actually covers it.
 
 **Prompt focus:**
+
 ```
 You are a QA engineer performing regression analysis.
 Given this PR diff, identify:
@@ -320,6 +352,7 @@ Be specific — name the files and user flows at risk.
 
 **Trigger:** After successful deployment to production
 **Action:**
+
 1. Hits the production URL
 2. Verifies critical user paths:
    - Home page loads (200 status)
@@ -347,14 +380,14 @@ jobs:
       - name: Check critical paths
         run: |
           PROD_URL="${{ vars.PRODUCTION_URL }}"
-          
+
           # Homepage
           curl -sf "$PROD_URL" > /dev/null || echo "FAIL: Homepage"
-          
+
           # Auth callback route exists
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$PROD_URL/auth/callback")
           [ "$STATUS" -lt "500" ] || echo "FAIL: Auth callback returning 5xx"
-          
+
           # Onboarding accessible
           curl -sf "$PROD_URL/onboarding/welcome" > /dev/null || echo "FAIL: Onboarding"
 ```
@@ -363,71 +396,69 @@ jobs:
 
 **Trigger:** Weekly cron (Sunday night)
 **Action:**
+
 1. Runs `npm audit`
 2. Checks for known CVEs in dependencies
 3. Identifies outdated major versions with security implications
 4. Opens a GitHub issue with findings (if any)
 5. Can optionally create a PR with `npm audit fix` for auto-fixable issues
 
-### Agent 6: Developer Agent
+### Agent 6: Developer Agent (Local)
 
-**Trigger:** Manual (you run `claude "Implement #42"`) or GitHub Action on `claude-ready` label
-**Action:**
-1. Reads the issue for context, acceptance criteria, design references
-2. Reads CLAUDE.md for project conventions
-3. Creates a feature branch
-4. Implements the feature/fix
-5. Writes tests for the new code
-6. Opens a PR referencing the issue
-7. If anything is unclear, comments on the issue asking for clarification BEFORE implementing
+**Runs:** Locally via Claude Code CLI (Max plan — no API cost)
+**Trigger:** Manual — you start a conversation in your terminal
 
-**This is your primary "developer."** It picks up groomed stories from the board.
+This is your primary "developer." It's the heaviest token consumer ($0.50–5.00/run on API), which is why it runs locally on your Max plan subscription.
 
-**Label-triggered automation:**
-```yaml
-name: Claude Developer Agent
-on:
-  issues:
-    types: [labeled]
+**Workflow:**
 
-jobs:
-  implement:
-    if: github.event.label.name == 'claude-ready'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt: |
-            Read issue #${{ github.event.issue.number }}.
-            Implement it following the conventions in CLAUDE.md.
-            Create a feature branch named feature/${{ github.event.issue.number }}-<short-description>.
-            Write tests. Open a PR. If anything is unclear, comment
-            on the issue asking for clarification and stop.
+1. You discuss the issue with Claude Code interactively — ask questions, refine approach
+2. Claude reads the issue, CLAUDE.md, and the knowledge graph for context
+3. Creates a feature branch: `feature/<issue-number>-<description>`
+4. Implements the feature using TDD (superpowers:test-driven-development)
+5. You review inline, iterate, discuss tradeoffs
+6. Push → CI agents handle the rest (review, security, regression)
+
+**Why local, not CI:** Development benefits from interactive conversation — you discuss architecture, catch misunderstandings early, iterate on approach. A CI agent can't ask "should this be a server component or client component?" and wait for your answer. Local Claude Code can.
+
+**Example session:**
+
+```bash
+claude "Read issue #42 and implement it. Follow CLAUDE.md conventions.
+       Create branch feature/42-user-profile. Write tests."
 ```
 
-### Agent 7: Test Writer
+**Optional CI fallback:** If you ever want unattended development (e.g., batch implementing trivial issues overnight), you can add a `claude-developer.yml` workflow triggered by the `claude-ready` label. But for a solo dev, local is more effective.
 
-**Trigger:** Manual or scheduled (weekly)
-**Action:**
-1. Scans the codebase for files with no corresponding test
-2. Prioritizes by risk (auth, data mutations, API routes)
-3. Writes unit tests for uncovered components and utilities
-4. Opens a PR with the new tests
+### Agent 7: Test Writer (Local)
 
-### Agent 8: Documentation Agent
+**Runs:** Locally via Claude Code CLI (Max plan — no API cost)
+**Trigger:** Manual — you decide when coverage needs attention
 
-**Trigger:** Manual
-**Action:**
-1. Reads recent git history
-2. Identifies API changes, new components, changed behavior
-3. Updates relevant documentation (API docs, component catalog)
-4. Opens a PR with doc updates
+**Workflow:**
+
+1. Ask Claude Code to scan for uncovered files: `claude "Find files with no tests. Prioritize auth and API routes."`
+2. Iterate on test quality interactively — discuss edge cases, mocking strategy
+3. Run tests locally to verify they pass before pushing
+
+**Why local:** Test writing is iterative. You'll go back and forth on mocking strategy, edge cases, and test design. This burns tokens — free on Max plan, expensive on API.
+
+### Agent 8: Documentation Agent (Local)
+
+**Runs:** Locally via Claude Code CLI (Max plan — no API cost)
+**Trigger:** Manual — after a feature is complete or before a release
+
+**Workflow:**
+
+1. Ask Claude Code to review recent changes: `claude "Review last 10 commits. Update any docs that are stale."`
+2. Review the suggested doc changes interactively
+3. Commit and push
 
 ### Agent 9: Stale Work Monitor
 
 **Trigger:** Daily cron
 **Action:**
+
 1. Lists PRs open > 3 days
 2. Lists issues in "In Progress" for > 5 days
 3. Lists issues with `claude-ready` label that have no linked PR
@@ -437,6 +468,7 @@ jobs:
 
 **Trigger:** PR that modifies `prisma/schema.prisma` or `sql/*.sql`
 **Action:**
+
 1. Analyzes the migration for safety:
    - Will it lock tables? (ALTER on large tables)
    - Is it backwards-compatible? (Can the old code run against the new schema?)
@@ -448,21 +480,37 @@ jobs:
 
 ### Are All These Agents Effective?
 
-**High value (implement immediately):**
-- PR Reviewer — catches real bugs, enforces consistency
-- Security Engineer — catches vulnerabilities humans miss
-- Developer Agent — does actual implementation work
-- Sanity Checker — catches broken deploys in minutes
+**High value — CI (implement immediately):**
 
-**Medium value (implement after core pipeline is stable):**
+- PR Reviewer — catches real bugs, enforces consistency (~$0.15/PR)
+- Security Engineer — catches vulnerabilities humans miss (~$0.10/PR)
+- Sanity Checker — catches broken deploys in minutes (free, curl-based)
+
+**High value — Local (use daily):**
+
+- Developer Agent — your primary coding partner (free on Max plan)
+- Test Writer — iterative test authoring (free on Max plan)
+
+**Medium value — CI (implement after core pipeline is stable):**
+
 - Regression Tester — valuable once you have meaningful test coverage
 - Migration Safety — valuable once your schema is evolving regularly
 - Dependency Auditor — set-and-forget, low cost
 
-**Lower priority (nice to have):**
-- Test Writer — helpful for building initial coverage, less useful ongoing
-- Documentation Agent — depends on your documentation needs
+**Lower priority — CI (nice to have):**
+
+- Documentation Agent — can also be local on demand
 - Stale Work Monitor — useful when you have multiple contributors/agents
+
+### Cost Optimization Summary
+
+| Your plan                  | Monthly API spend | What runs on API                                |
+| -------------------------- | ----------------- | ----------------------------------------------- |
+| Max ($100/mo)              | ~$5–15            | CI agents only (reviews, scans, cron)           |
+| Pro ($20/mo)               | ~$5–15            | CI agents only — but local work is rate-limited |
+| API-only (no subscription) | ~$25–60           | Everything — development is the expensive part  |
+
+**Recommendation:** Max plan + API key is the sweet spot. You get unlimited local development (planning, implementing, testing, discussing) and only pay API rates for lightweight CI automations.
 
 ---
 
@@ -471,6 +519,7 @@ jobs:
 ### Platform: GitHub Projects (Free)
 
 GitHub Projects is the right choice because:
+
 - Claude agents access it natively via `gh` CLI (no API tokens, no MCP setup)
 - Issues, PRs, and branches are linked automatically
 - Free for all repo types
@@ -478,27 +527,27 @@ GitHub Projects is the right choice because:
 
 ### Board Columns (Status Field)
 
-| Column | Meaning | Who Moves Items Here |
-|---|---|---|
-| **Backlog** | Ideas, unrefined work. Not ready for implementation. | You (manual) |
-| **Grooming** | Being refined — needs acceptance criteria, design refs, technical notes. | You (manual) |
-| **Ready** | Groomed and estimated. A human could pick this up. | You (after grooming) |
+| Column           | Meaning                                                                      | Who Moves Items Here                           |
+| ---------------- | ---------------------------------------------------------------------------- | ---------------------------------------------- |
+| **Backlog**      | Ideas, unrefined work. Not ready for implementation.                         | You (manual)                                   |
+| **Grooming**     | Being refined — needs acceptance criteria, design refs, technical notes.     | You (manual)                                   |
+| **Ready**        | Groomed and estimated. A human could pick this up.                           | You (after grooming)                           |
 | **Claude Ready** | Groomed + has `claude-ready` label. An agent can pick this up independently. | You (after adding enough context for an agent) |
-| **In Progress** | Someone (human or agent) is actively working on it. | Auto (when branch is created or PR is opened) |
-| **In Review** | PR is open, awaiting review. | Auto (when PR is opened) |
-| **QA / UAT** | Merged to develop or staging, awaiting verification. | Auto (when PR merges to develop/staging) |
-| **Done** | Merged to main and deployed to production. | Auto (when PR merges to main) |
+| **In Progress**  | Someone (human or agent) is actively working on it.                          | Auto (when branch is created or PR is opened)  |
+| **In Review**    | PR is open, awaiting review.                                                 | Auto (when PR is opened)                       |
+| **QA / UAT**     | Merged to develop or staging, awaiting verification.                         | Auto (when PR merges to develop/staging)       |
+| **Done**         | Merged to main and deployed to production.                                   | Auto (when PR merges to main)                  |
 
 ### Custom Fields
 
-| Field | Type | Values | Purpose |
-|---|---|---|---|
-| **Size** | Single select | XS, S, M, L, XL | Effort estimate for sprint planning |
-| **Type** | Single select | Feature, Bug, Chore, Spike | Categorization |
-| **Sprint** | Iteration | 2-week iterations | Sprint assignment |
-| **Priority** | Single select | P0-Critical, P1-High, P2-Medium, P3-Low | Urgency |
-| **Agent Compatible** | Single select | Yes, Needs Clarification, No | Can a Claude agent do this? |
-| **Risk** | Single select | Low, Medium, High | Regression risk assessment |
+| Field                | Type          | Values                                  | Purpose                             |
+| -------------------- | ------------- | --------------------------------------- | ----------------------------------- |
+| **Size**             | Single select | XS, S, M, L, XL                         | Effort estimate for sprint planning |
+| **Type**             | Single select | Feature, Bug, Chore, Spike              | Categorization                      |
+| **Sprint**           | Iteration     | 2-week iterations                       | Sprint assignment                   |
+| **Priority**         | Single select | P0-Critical, P1-High, P2-Medium, P3-Low | Urgency                             |
+| **Agent Compatible** | Single select | Yes, Needs Clarification, No            | Can a Claude agent do this?         |
+| **Risk**             | Single select | Low, Medium, High                       | Regression risk assessment          |
 
 ### Labels (on Issues)
 
@@ -545,6 +594,7 @@ blocked          (red)
 GitHub Projects boards cannot be included in a template repository (they're org/user-level, not repo-level). Instead, the template includes a **setup script** that creates the board programmatically:
 
 **`scripts/setup-sprint-board.sh`:**
+
 ```bash
 #!/bin/bash
 set -euo pipefail
@@ -600,6 +650,7 @@ echo "Link: https://github.com/users/$OWNER/projects/$(gh project list --owner "
 ```
 
 **`scripts/seed-labels.sh`:**
+
 ```bash
 #!/bin/bash
 set -euo pipefail
@@ -679,29 +730,32 @@ Friday (Sprint Review):
 
 An agent needs the same things a new developer on day one would need, but written more explicitly:
 
-| Element | Why the Agent Needs It |
-|---|---|
-| **Context** — which part of the app, which files | Agent won't know where to start without this |
-| **Acceptance criteria** — testable checkboxes | Agent needs a definition of "done" |
-| **Technical notes** — patterns to follow, libs to use | Agent might pick a different approach without guidance |
-| **Out of scope** — what NOT to do | Agent will over-build without explicit boundaries |
-| **Design reference** — screenshot, Figma link, or description | Agent can't guess what it should look like |
+| Element                                                       | Why the Agent Needs It                                 |
+| ------------------------------------------------------------- | ------------------------------------------------------ |
+| **Context** — which part of the app, which files              | Agent won't know where to start without this           |
+| **Acceptance criteria** — testable checkboxes                 | Agent needs a definition of "done"                     |
+| **Technical notes** — patterns to follow, libs to use         | Agent might pick a different approach without guidance |
+| **Out of scope** — what NOT to do                             | Agent will over-build without explicit boundaries      |
+| **Design reference** — screenshot, Figma link, or description | Agent can't guess what it should look like             |
 
 ### Feature Story Template
 
 ```markdown
 ## Title
+
 [Verb] [thing] [where]
 Example: Add Google OAuth button to login page
 
 ## Context
+
 [Which part of the app does this touch? Name specific files or directories.]
 
-The onboarding flow lives in `src/app/onboarding/`. The login page is 
+The onboarding flow lives in `src/app/onboarding/`. The login page is
 `src/app/page.tsx`. Supabase Auth is configured in `src/lib/supabase/`.
 The design mockup is at `Screens for onboarding/login.png`.
 
 ## Acceptance Criteria
+
 - [ ] Google OAuth button renders on the login page
 - [ ] Clicking initiates Supabase `signInWithOAuth({ provider: 'google' })`
 - [ ] Successful auth redirects to `/onboarding/welcome`
@@ -710,24 +764,29 @@ The design mockup is at `Screens for onboarding/login.png`.
 - [ ] Works on mobile (375px viewport)
 
 ## Technical Notes
+
 - Use `@supabase/ssr` `createClient` for server-side auth
 - Follow component patterns in `src/components/` (see `primary-button.tsx`)
 - Use Material Design 3 color tokens from `globals.css`
 - The auth callback route already exists at `src/app/auth/callback/route.ts`
 
 ## Out of Scope
+
 - Apple OAuth (separate story: #XX)
 - First/last name fields on signup form (deferred)
 - Account linking if user already exists with email/password
 
 ## Design Reference
-`Screens for onboarding/login.png` — Google button should be below the 
+
+`Screens for onboarding/login.png` — Google button should be below the
 email/password form, full-width, with Google logo icon.
 
 ## Size
+
 M (Medium)
 
 ## Agent Compatible?
+
 Yes — fully specified
 ```
 
@@ -735,32 +794,39 @@ Yes — fully specified
 
 ```markdown
 ## Title
+
 [Thing] [is broken / does wrong thing] [when condition]
 Example: Login redirect loops when session cookie is expired
 
 ## Steps to Reproduce
+
 1. Log in successfully
 2. Wait for session to expire (or clear the `sb-` cookies manually)
 3. Navigate to `/dashboard`
 4. Observe: page redirects to `/` which redirects back to `/dashboard` infinitely
 
 ## Expected Behavior
+
 User should be redirected to `/` (login page) and stay there.
 
 ## Actual Behavior
+
 Infinite redirect loop between `/` and `/dashboard`.
 
 ## Context
+
 - Middleware: `src/middleware.ts`
 - Auth check: `src/lib/supabase/middleware.ts`
 - Session utility: `src/lib/session.ts`
 
 ## Acceptance Criteria
+
 - [ ] Expired session redirects to `/` without looping
 - [ ] No redirect loop under any auth state
 - [ ] Add a test that verifies redirect behavior
 
 ## Agent Compatible?
+
 Yes — fully specified
 ```
 
@@ -807,11 +873,7 @@ Same as `main`, but without the manual approval gate.
   },
   "required_status_checks": {
     "strict": false,
-    "contexts": [
-      "ci / lint",
-      "ci / typecheck",
-      "ci / build"
-    ]
+    "contexts": ["ci / lint", "ci / typecheck", "ci / build"]
   },
   "required_linear_history": true,
   "allow_force_pushes": false
@@ -838,7 +900,7 @@ git checkout main
 # Apply branch protection via GitHub API
 for BRANCH in main staging develop; do
   echo "Setting protection for $BRANCH..."
-  
+
   if [ "$BRANCH" = "main" ]; then
     REQUIRED_REVIEWS=1
     STRICT=true
@@ -883,11 +945,11 @@ done
 
 ### Supabase — Three Projects
 
-| Project | Name | Plan | Cost |
-|---|---|---|---|
-| INT | `projectname-int` | Free | $0 |
-| UAT | `projectname-uat` | Free | $0 |
-| PROD | `projectname-prod` | Pro | $25/mo |
+| Project | Name               | Plan | Cost   |
+| ------- | ------------------ | ---- | ------ |
+| INT     | `projectname-int`  | Free | $0     |
+| UAT     | `projectname-uat`  | Free | $0     |
+| PROD    | `projectname-prod` | Pro  | $25/mo |
 
 **Setup steps:**
 
@@ -904,14 +966,15 @@ done
 
 In Vercel project settings → Environment Variables:
 
-| Variable | Production (`main`) | Preview (`staging`) | Preview (`develop`) |
-|---|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://xxx.supabase.co` (PROD) | `https://yyy.supabase.co` (UAT) | `https://zzz.supabase.co` (INT) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | PROD anon key | UAT anon key | INT anon key |
-| `DATABASE_URL` | PROD connection string | UAT connection string | INT connection string |
-| `SUPABASE_SERVICE_ROLE_KEY` | PROD service key | UAT service key | INT service key |
+| Variable                        | Production (`main`)              | Preview (`staging`)             | Preview (`develop`)             |
+| ------------------------------- | -------------------------------- | ------------------------------- | ------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | `https://xxx.supabase.co` (PROD) | `https://yyy.supabase.co` (UAT) | `https://zzz.supabase.co` (INT) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | PROD anon key                    | UAT anon key                    | INT anon key                    |
+| `DATABASE_URL`                  | PROD connection string           | UAT connection string           | INT connection string           |
+| `SUPABASE_SERVICE_ROLE_KEY`     | PROD service key                 | UAT service key                 | INT service key                 |
 
 **Vercel branch mapping:**
+
 - Production domain → `main` branch
 - `staging.projectname.vercel.app` → `staging` branch (configure in Vercel)
 - Preview deploys → all other branches (auto)
@@ -1015,6 +1078,7 @@ graph.json updated         ← Agents use this on next run
 Instead of giving agents free rein to explore the codebase (expensive, slow, often wrong), point them at the graph:
 
 **In agent prompts, add:**
+
 ```
 Before implementing, check the knowledge graph at graphify-out/GRAPH_REPORT.md
 for architecture context. Query graphify-out/graph.json for dependency relationships.
@@ -1058,7 +1122,9 @@ Add this block to your project's CLAUDE.md so all agents know about the graph:
 
 ```markdown
 ## Knowledge Graph
+
 A Graphify knowledge graph is maintained at `graphify-out/`.
+
 - For architecture questions, read `graphify-out/GRAPH_REPORT.md` first
 - For dependency lookups, query `graphify-out/graph.json`
 - Do NOT re-read entire directories when the graph can answer your question
@@ -1099,12 +1165,12 @@ Add to the template so every new project gets Graphify wired in:
 
 ### Why Not Now
 
-| Concern | Detail |
-|---|---|
-| **Complexity** | Adds hosting (Docker/VPS), Supabase vector config, agent runtime management |
-| **Cost** | VPS hosting ($5-20/mo) + same LLM costs + engineering time to set up |
-| **Diminishing returns early on** | Your current pipeline is stateless and that's fine for <50 stories |
-| **Dependency risk** | Archon is evolving rapidly; locking in now means churn later |
+| Concern                          | Detail                                                                      |
+| -------------------------------- | --------------------------------------------------------------------------- |
+| **Complexity**                   | Adds hosting (Docker/VPS), Supabase vector config, agent runtime management |
+| **Cost**                         | VPS hosting ($5-20/mo) + same LLM costs + engineering time to set up        |
+| **Diminishing returns early on** | Your current pipeline is stateless and that's fine for <50 stories          |
+| **Dependency risk**              | Archon is evolving rapidly; locking in now means churn later                |
 
 ### When to Adopt Archon
 
@@ -1156,6 +1222,7 @@ Trigger any **two** of these conditions:
 #### Phased Rollout
 
 **Phase A — Validate the pipeline (NOW):**
+
 - Use stateless GHA agents + Graphify for structural context
 - Manually run `/graphify --update` after significant merges
 - Automate graph updates via the CI workflow above
@@ -1164,6 +1231,7 @@ Trigger any **two** of these conditions:
 **Phase B — Add Archon when triggered (FUTURE):**
 
 1. **Set up Archon runtime:**
+
    ```
    # Self-hosted on a VPS or Docker
    archon/
@@ -1192,18 +1260,18 @@ Trigger any **two** of these conditions:
 
 ### Cost Impact
 
-| Item | Current (Stateless) | With Archon |
-|---|---|---|
-| Agent LLM costs | Same | Same |
-| VPS for Archon runtime | $0 | $5-20/mo |
-| Supabase vector storage | $0 (included in Pro plan) | $0 |
-| Setup time | 0 | ~1-2 days |
-| **Net benefit** | — | Agents make fewer mistakes, work autonomously, remember past context |
+| Item                    | Current (Stateless)       | With Archon                                                          |
+| ----------------------- | ------------------------- | -------------------------------------------------------------------- |
+| Agent LLM costs         | Same                      | Same                                                                 |
+| VPS for Archon runtime  | $0                        | $5-20/mo                                                             |
+| Supabase vector storage | $0 (included in Pro plan) | $0                                                                   |
+| Setup time              | 0                         | ~1-2 days                                                            |
+| **Net benefit**         | —                         | Agents make fewer mistakes, work autonomously, remember past context |
 
 ### What NOT to Do
 
 - **Don't run Archon and GHA agents in parallel for the same task.** Pick one runtime per agent type.
-- **Don't store code in Archon's vector memory.** That's what Graphify and git are for. Archon stores *decisions and context*, not *code*.
+- **Don't store code in Archon's vector memory.** That's what Graphify and git are for. Archon stores _decisions and context_, not _code_.
 - **Don't skip Graphify.** Archon's semantic memory complements Graphify's structural memory — they're not interchangeable. You need both when you adopt Archon.
 
 ---
@@ -1222,21 +1290,21 @@ Everything posts to a single **`#pipeline`** channel. Every message means either
 
 ### What Gets Posted (and What Doesn't)
 
-| Posts to Slack | Why |
-|---|---|
-| Production deploy + sanity check result | Can't afford to miss a broken prod |
-| Security scan CRITICAL findings | Not every finding — just ones that block merge |
-| Agent blocked / needs clarification | Story sits untouched until you know |
-| PR ready for your review | All agent checks passed, waiting on you |
-| Weekly sprint digest | Know where you stand without opening GitHub |
+| Posts to Slack                          | Why                                            |
+| --------------------------------------- | ---------------------------------------------- |
+| Production deploy + sanity check result | Can't afford to miss a broken prod             |
+| Security scan CRITICAL findings         | Not every finding — just ones that block merge |
+| Agent blocked / needs clarification     | Story sits untouched until you know            |
+| PR ready for your review                | All agent checks passed, waiting on you        |
+| Weekly sprint digest                    | Know where you stand without opening GitHub    |
 
-| Does NOT post to Slack | Why |
-|---|---|
-| Every PR opened | You know — you triggered the agent |
-| Every CI pass | Noise. You only care about failures |
-| Every commit | Absolute noise |
+| Does NOT post to Slack   | Why                                      |
+| ------------------------ | ---------------------------------------- |
+| Every PR opened          | You know — you triggered the agent       |
+| Every CI pass            | Noise. You only care about failures      |
+| Every commit             | Absolute noise                           |
 | Dependency audit results | They create GitHub issues, that's enough |
-| Stale PR reminders | You're solo, you know what's stale |
+| Stale PR reminders       | You're solo, you know what's stale       |
 
 ### Setup (One-Time)
 
@@ -1329,16 +1397,16 @@ Add a Slack notification step to existing workflows. The pattern is the same eve
 #### Pattern: Add to `claude-sanity-check.yml`
 
 ```yaml
-    - name: Notify Slack
-      if: always()
-      uses: slackapi/slack-github-action@v2.1.0
-      with:
-        webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-        webhook-type: incoming-webhook
-        payload: |
-          {
-            "text": "${{ job.status == 'success' && '✅' || '🚨' }} *Production Sanity Check: ${{ job.status }}*\nCommit: `${{ github.sha }}` by @${{ github.actor }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
-          }
+- name: Notify Slack
+  if: always()
+  uses: slackapi/slack-github-action@v2.1.0
+  with:
+    webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+    webhook-type: incoming-webhook
+    payload: |
+      {
+        "text": "${{ job.status == 'success' && '✅' || '🚨' }} *Production Sanity Check: ${{ job.status }}*\nCommit: `${{ github.sha }}` by @${{ github.actor }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+      }
 ```
 
 #### Pattern: Add to `claude-security-scan.yml`
@@ -1346,16 +1414,16 @@ Add a Slack notification step to existing workflows. The pattern is the same eve
 Post only on CRITICAL findings. The Claude agent writes its findings to `GITHUB_STEP_SUMMARY`. Parse for CRITICAL:
 
 ```yaml
-    - name: Notify Slack on Critical
-      if: contains(steps.security-scan.outputs.summary, 'CRITICAL')
-      uses: slackapi/slack-github-action@v2.1.0
-      with:
-        webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-        webhook-type: incoming-webhook
-        payload: |
-          {
-            "text": "🔴 *CRITICAL Security Finding* on PR #${{ github.event.pull_request.number }}\n${{ github.event.pull_request.title }}\n<${{ github.event.pull_request.html_url }}|Review PR>"
-          }
+- name: Notify Slack on Critical
+  if: contains(steps.security-scan.outputs.summary, 'CRITICAL')
+  uses: slackapi/slack-github-action@v2.1.0
+  with:
+    webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+    webhook-type: incoming-webhook
+    payload: |
+      {
+        "text": "🔴 *CRITICAL Security Finding* on PR #${{ github.event.pull_request.number }}\n${{ github.event.pull_request.title }}\n<${{ github.event.pull_request.html_url }}|Review PR>"
+      }
 ```
 
 #### Pattern: Add to `claude-pr-review.yml`
@@ -1363,16 +1431,16 @@ Post only on CRITICAL findings. The Claude agent writes its findings to `GITHUB_
 Post when all checks pass (PR is ready for human merge):
 
 ```yaml
-    - name: Notify PR Ready
-      if: success()
-      uses: slackapi/slack-github-action@v2.1.0
-      with:
-        webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-        webhook-type: incoming-webhook
-        payload: |
-          {
-            "text": "✅ *PR #${{ github.event.pull_request.number }} ready for merge*\n${{ github.event.pull_request.title }}\nCI: ✅ | Review: ✅ | Security: ✅\n<${{ github.event.pull_request.html_url }}|Open PR>"
-          }
+- name: Notify PR Ready
+  if: success()
+  uses: slackapi/slack-github-action@v2.1.0
+  with:
+    webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+    webhook-type: incoming-webhook
+    payload: |
+      {
+        "text": "✅ *PR #${{ github.event.pull_request.number }} ready for merge*\n${{ github.event.pull_request.title }}\nCI: ✅ | Review: ✅ | Security: ✅\n<${{ github.event.pull_request.html_url }}|Open PR>"
+      }
 ```
 
 #### New Workflow: Weekly Sprint Digest
@@ -1382,7 +1450,7 @@ Post when all checks pass (PR is ready for human merge):
 name: Weekly Sprint Digest
 on:
   schedule:
-    - cron: '0 18 * * 0'  # Sunday 6pm UTC
+    - cron: "0 18 * * 0" # Sunday 6pm UTC
   workflow_dispatch:
 
 jobs:
@@ -1452,10 +1520,10 @@ POST /api/slack/commands
 
 ### What to Add to GitHub Secrets
 
-| Secret | Purpose | Where to Get It |
-|---|---|---|
-| `SLACK_WEBHOOK_URL` | Incoming webhook for `#pipeline` channel | Slack App → Incoming Webhooks |
-| `SLACK_SIGNING_SECRET` | (Only if using slash commands Option B) | Slack App → Basic Information |
+| Secret                 | Purpose                                  | Where to Get It               |
+| ---------------------- | ---------------------------------------- | ----------------------------- |
+| `SLACK_WEBHOOK_URL`    | Incoming webhook for `#pipeline` channel | Slack App → Incoming Webhooks |
+| `SLACK_SIGNING_SECRET` | (Only if using slash commands Option B)  | Slack App → Basic Information |
 
 ### Template Repo Changes
 
@@ -1477,6 +1545,7 @@ Add to the template so every new project gets Slack wired in:
 ### One-Time Setup (Do This Once)
 
 1. **Create the template repo on GitHub:**
+
    ```bash
    gh repo create suyash-project-template --public --description "Project template with CI/CD, Claude agents, and sprint board"
    ```
@@ -1492,19 +1561,19 @@ Add to the template so every new project gets Slack wired in:
 ### What the Template Includes vs What the Setup Script Does
 
 | Included in template (copied on clone) | Created by setup script (run once after clone) |
-|---|---|
-| `.github/workflows/*.yml` | GitHub Projects board + columns + fields |
-| `.github/ISSUE_TEMPLATE/*.yml` | Issue labels |
-| `.github/PULL_REQUEST_TEMPLATE.md` | Branch protection rules |
-| `.github/CODEOWNERS` | `develop` and `staging` branches |
-| `scripts/*.sh` | — |
-| `CLAUDE.md` (base) | — |
-| `AGENTS.md` | — |
-| `.env.example` | — |
-| `.husky/` config | — |
-| `vitest.config.ts` | — |
-| `playwright.config.ts` | — |
-| `docs/PIPELINE_PLAYBOOK.md` | — |
+| -------------------------------------- | ---------------------------------------------- |
+| `.github/workflows/*.yml`              | GitHub Projects board + columns + fields       |
+| `.github/ISSUE_TEMPLATE/*.yml`         | Issue labels                                   |
+| `.github/PULL_REQUEST_TEMPLATE.md`     | Branch protection rules                        |
+| `.github/CODEOWNERS`                   | `develop` and `staging` branches               |
+| `scripts/*.sh`                         | —                                              |
+| `CLAUDE.md` (base)                     | —                                              |
+| `AGENTS.md`                            | —                                              |
+| `.env.example`                         | —                                              |
+| `.husky/` config                       | —                                              |
+| `vitest.config.ts`                     | —                                              |
+| `playwright.config.ts`                 | —                                              |
+| `docs/PIPELINE_PLAYBOOK.md`            | —                                              |
 
 ### Master Setup Script (`scripts/setup-project.sh`)
 
@@ -1596,31 +1665,31 @@ gh secret set ANTHROPIC_API_KEY
 
 ### Monthly Costs (Active Development)
 
-| Item | Cost | Notes |
-|---|---|---|
-| **Supabase** | $25 | 2 free projects (INT, UAT) + 1 Pro (PROD) |
-| **Vercel Pro** | $20 | Needed for team features + preview deploy controls |
-| **GitHub** | $0–4 | Free for public, $4/user/mo for private Teams |
-| **Claude Max Plan** | $100–200 | Your interactive development sessions |
-| **Claude API (PR Review)** | $15–25 | ~50 PRs/mo × $0.30–0.50 avg |
-| **Claude API (Security Scan)** | $10–20 | ~50 PRs/mo × $0.20–0.40 avg |
-| **Claude API (Regression)** | $10–20 | ~30 PRs/mo × $0.30–0.60 avg |
-| **Claude API (Sanity + Cron agents)** | $5–15 | Low frequency, small prompts |
-| **Claude API (Developer Agent)** | $20–50 | Depends on how many stories you delegate |
-| **Graphify graph updates** | $2–5 | ~$0.05–0.10 per incremental update, runs on merge to develop |
-| **Archon VPS (future)** | $0 (now) / $5–20 (later) | Only when you adopt Archon for stateful agents |
-| **Slack integration** | $0 | Free tier covers webhooks, slash commands, and Workflow Builder |
-| **Domain + DNS** | $12–15 | Annual, amortized |
-| **Total (now)** | **$222–375/mo** | |
-| **Total (with Archon, future)** | **$227–395/mo** | |
+| Item                                  | Cost                     | Notes                                                           |
+| ------------------------------------- | ------------------------ | --------------------------------------------------------------- |
+| **Supabase**                          | $25                      | 2 free projects (INT, UAT) + 1 Pro (PROD)                       |
+| **Vercel Pro**                        | $20                      | Needed for team features + preview deploy controls              |
+| **GitHub**                            | $0–4                     | Free for public, $4/user/mo for private Teams                   |
+| **Claude Max Plan**                   | $100–200                 | Your interactive development sessions                           |
+| **Claude API (PR Review)**            | $15–25                   | ~50 PRs/mo × $0.30–0.50 avg                                     |
+| **Claude API (Security Scan)**        | $10–20                   | ~50 PRs/mo × $0.20–0.40 avg                                     |
+| **Claude API (Regression)**           | $10–20                   | ~30 PRs/mo × $0.30–0.60 avg                                     |
+| **Claude API (Sanity + Cron agents)** | $5–15                    | Low frequency, small prompts                                    |
+| **Claude API (Developer Agent)**      | $20–50                   | Depends on how many stories you delegate                        |
+| **Graphify graph updates**            | $2–5                     | ~$0.05–0.10 per incremental update, runs on merge to develop    |
+| **Archon VPS (future)**               | $0 (now) / $5–20 (later) | Only when you adopt Archon for stateful agents                  |
+| **Slack integration**                 | $0                       | Free tier covers webhooks, slash commands, and Workflow Builder |
+| **Domain + DNS**                      | $12–15                   | Annual, amortized                                               |
+| **Total (now)**                       | **$222–375/mo**          |                                                                 |
+| **Total (with Archon, future)**       | **$227–395/mo**          |                                                                 |
 
 ### Comparison
 
-| Setup | Monthly Cost | Output |
-|---|---|---|
-| This pipeline (you + Claude agents) | $220–370 | Full CI/CD, automated review, security, testing |
-| Junior developer (part-time) | $2,000–4,000 | No automated pipeline, manual reviews |
-| Small dev team (2 devs + DevOps) | $15,000–30,000 | Full pipeline but 50-100x the cost |
+| Setup                               | Monthly Cost   | Output                                          |
+| ----------------------------------- | -------------- | ----------------------------------------------- |
+| This pipeline (you + Claude agents) | $220–370       | Full CI/CD, automated review, security, testing |
+| Junior developer (part-time)        | $2,000–4,000   | No automated pipeline, manual reviews           |
+| Small dev team (2 devs + DevOps)    | $15,000–30,000 | Full pipeline but 50-100x the cost              |
 
 ---
 
@@ -1628,26 +1697,26 @@ gh secret set ANTHROPIC_API_KEY
 
 ### What Works Well Today
 
-| Capability | Maturity | Notes |
-|---|---|---|
-| **PR code review** | Production-ready | Claude catches real bugs, style issues, logic errors |
-| **Security scanning** | Production-ready | Finds injection, auth gaps, secrets in code |
-| **Story implementation** | Good, needs oversight | Agent implements ~80% of well-groomed stories correctly. Remaining 20% needs human revision |
-| **Test writing** | Good | Generates reasonable unit tests. Integration tests need more guidance |
-| **CI/CD pipeline** | Industry standard | GitHub Actions is battle-tested, nothing experimental here |
-| **Graphify knowledge graph** | Use now | Reduces agent token burn by 60-80% on architecture queries. Run `--update` after merges |
-| **Archon stateful agents** | Planned (future) | Adopt when stateless agents hit real memory/autonomy limits |
-| **Slack notifications** | Implement now | Single #pipeline channel — deploy results, critical security, agent-blocked, PR ready |
+| Capability                   | Maturity              | Notes                                                                                       |
+| ---------------------------- | --------------------- | ------------------------------------------------------------------------------------------- |
+| **PR code review**           | Production-ready      | Claude catches real bugs, style issues, logic errors                                        |
+| **Security scanning**        | Production-ready      | Finds injection, auth gaps, secrets in code                                                 |
+| **Story implementation**     | Good, needs oversight | Agent implements ~80% of well-groomed stories correctly. Remaining 20% needs human revision |
+| **Test writing**             | Good                  | Generates reasonable unit tests. Integration tests need more guidance                       |
+| **CI/CD pipeline**           | Industry standard     | GitHub Actions is battle-tested, nothing experimental here                                  |
+| **Graphify knowledge graph** | Use now               | Reduces agent token burn by 60-80% on architecture queries. Run `--update` after merges     |
+| **Archon stateful agents**   | Planned (future)      | Adopt when stateless agents hit real memory/autonomy limits                                 |
+| **Slack notifications**      | Implement now         | Single #pipeline channel — deploy results, critical security, agent-blocked, PR ready       |
 
 ### What Requires Human Judgment
 
-| Area | Why |
-|---|---|
+| Area                       | Why                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------- |
 | **Architecture decisions** | Agent builds what you tell it to — it won't question whether you should build it |
-| **Product direction** | Agent implements specs, doesn't decide what to build |
-| **Final PR approval** | Always have a human merge. Agent reviews inform, not decide |
-| **Production incidents** | Agent can help debug but shouldn't have prod access to run fixes autonomously |
-| **Story grooming** | The quality of agent output = quality of story input. Garbage in, garbage out |
+| **Product direction**      | Agent implements specs, doesn't decide what to build                             |
+| **Final PR approval**      | Always have a human merge. Agent reviews inform, not decide                      |
+| **Production incidents**   | Agent can help debug but shouldn't have prod access to run fixes autonomously    |
+| **Story grooming**         | The quality of agent output = quality of story input. Garbage in, garbage out    |
 
 ### Key Principle
 

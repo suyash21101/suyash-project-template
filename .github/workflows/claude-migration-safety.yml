@@ -1,0 +1,67 @@
+name: Claude Migration Safety Check
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - "sql/**"
+      - "prisma/schema.prisma"
+      - "prisma/migrations/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+
+jobs:
+  migration-safety:
+    name: Claude Migration Safety
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: sonnet
+          timeout_minutes: 10
+          prompt: |
+            You are a database migration safety reviewer for a Next.js + Supabase (PostgreSQL) app
+            using Prisma ORM with raw SQL migrations in `sql/`.
+
+            ## Review the changed migration/schema files for:
+
+            ### Data Safety
+            - DROP TABLE or DROP COLUMN without a backup/migration plan
+            - ALTER COLUMN that changes type on a populated table (data loss risk)
+            - TRUNCATE or DELETE without WHERE clause
+            - NOT NULL added to existing column without DEFAULT (breaks existing rows)
+
+            ### Downtime Risk
+            - Exclusive locks on large tables (ALTER TABLE on hot tables)
+            - CREATE INDEX without CONCURRENTLY on large tables
+            - Long-running backfill operations that could block writes
+            - Operations that require table rewrites (changing column types, adding NOT NULL)
+
+            ### Supabase / RLS
+            - New tables missing RLS policies (Supabase requires explicit RLS)
+            - ENABLE ROW LEVEL SECURITY missing on new tables
+            - Overly permissive RLS policies (e.g., using `true` for SELECT)
+            - Service role bypass where anon access is intended (or vice versa)
+
+            ### Prisma Sync
+            - Schema changes in SQL that aren't reflected in prisma/schema.prisma
+            - Prisma schema changes that don't have a corresponding SQL migration
+            - Migration numbering gaps or ordering issues in sql/
+
+            ### Rollback
+            - Is this migration reversible? If not, flag it.
+            - Would rolling back require manual data recovery?
+
+            ## Output Format
+            Rate each finding: CRITICAL, HIGH, MEDIUM, LOW, INFO.
+            CRITICAL = blocks merge (data loss, downtime, security).
+            If safe, state "Migration looks safe" and approve.
