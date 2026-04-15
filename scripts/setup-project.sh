@@ -21,7 +21,7 @@ echo "Owner:      $OWNER"
 echo ""
 
 # Step 1: Install dependencies
-echo "[1/6] Installing dependencies..."
+echo "[1/7] Installing dependencies..."
 if [ -f "package.json" ]; then
   npm install
   echo "  Done."
@@ -31,7 +31,7 @@ fi
 echo ""
 
 # Step 2: Create branches
-echo "[2/6] Creating develop and staging branches..."
+echo "[2/7] Creating develop and staging branches..."
 CURRENT=$(git branch --show-current)
 
 for BRANCH in develop staging; do
@@ -51,23 +51,30 @@ git checkout "$CURRENT" 2>/dev/null
 echo ""
 
 # Step 3: Seed labels
-echo "[3/6] Creating issue labels..."
+echo "[3/7] Creating issue labels..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bash "$SCRIPT_DIR/seed-labels.sh" "$REPO"
 echo ""
 
 # Step 4: Branch protection
-echo "[4/6] Applying branch protection rules..."
+echo "[4/7] Applying branch protection rules..."
 bash "$SCRIPT_DIR/setup-branch-protection.sh" "$REPO"
 echo ""
 
 # Step 5: Sprint board
-echo "[5/6] Creating sprint board..."
+echo "[5/7] Creating sprint board..."
 bash "$SCRIPT_DIR/setup-sprint-board.sh" "$OWNER" "$REPO_NAME Sprint Board"
 echo ""
 
-# Step 6: Verify
-echo "[6/6] Verifying setup..."
+# Step 6: Graphify knowledge graph
+echo "[6/7] Knowledge graph setup..."
+echo "  Run this manually after setup:"
+echo "  claude '/graphify . --mode deep'"
+echo "  The graph will be committed to graphify-out/"
+echo ""
+
+# Step 7: Verify
+echo "[7/7] Verifying setup..."
 echo ""
 echo "  Branches:"
 git branch -a | grep -E "(develop|staging|main)" | sed 's/^/    /'
@@ -98,5 +105,8 @@ echo ""
 echo "  5. Customize the sprint board columns in GitHub Projects UI:"
 echo "     Add: Grooming, Claude Ready, In Review, QA/UAT"
 echo ""
-echo "  6. Start writing stories!"
+echo "  6. Generate initial knowledge graph:"
+echo "     claude '/graphify . --mode deep'"
+echo ""
+echo "  7. Start writing stories!"
 echo ""
