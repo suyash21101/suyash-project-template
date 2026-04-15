@@ -17,10 +17,11 @@
 8. [Environment Setup (Supabase + Vercel)](#8-environment-setup-supabase--vercel)
 9. [Knowledge Layer — Graphify](#9-knowledge-layer--graphify)
 10. [Stateful Agent Layer — Archon (Future)](#10-stateful-agent-layer--archon-future)
-11. [Template Repository Setup](#11-template-repository-setup)
-12. [New Project Bootstrap (From Template)](#12-new-project-bootstrap-from-template)
-13. [Cost Breakdown](#13-cost-breakdown)
-14. [Effectiveness Assessment](#14-effectiveness-assessment)
+11. [Slack Integration — Pipeline Notifications & Commands](#11-slack-integration--pipeline-notifications--commands)
+12. [Template Repository Setup](#12-template-repository-setup)
+13. [New Project Bootstrap (From Template)](#13-new-project-bootstrap-from-template)
+14. [Cost Breakdown](#14-cost-breakdown)
+15. [Effectiveness Assessment](#15-effectiveness-assessment)
 
 ---
 
@@ -1207,7 +1208,271 @@ Trigger any **two** of these conditions:
 
 ---
 
-## 11. Template Repository Setup
+## 11. Slack Integration — Pipeline Notifications & Commands
+
+### Philosophy: One Channel, Only Actionable
+
+You're a solo developer. Slack isn't for team chat — it's three things:
+
+1. **An alert channel you check on your phone** (not GitHub notification hell)
+2. **A command line you can use from anywhere** (trigger deploys, check status)
+3. **An audit trail of what agents did while you were away**
+
+Everything posts to a single **`#pipeline`** channel. Every message means either "something important happened" or "you need to do something." Zero noise.
+
+### What Gets Posted (and What Doesn't)
+
+| Posts to Slack | Why |
+|---|---|
+| Production deploy + sanity check result | Can't afford to miss a broken prod |
+| Security scan CRITICAL findings | Not every finding — just ones that block merge |
+| Agent blocked / needs clarification | Story sits untouched until you know |
+| PR ready for your review | All agent checks passed, waiting on you |
+| Weekly sprint digest | Know where you stand without opening GitHub |
+
+| Does NOT post to Slack | Why |
+|---|---|
+| Every PR opened | You know — you triggered the agent |
+| Every CI pass | Noise. You only care about failures |
+| Every commit | Absolute noise |
+| Dependency audit results | They create GitHub issues, that's enough |
+| Stale PR reminders | You're solo, you know what's stale |
+
+### Setup (One-Time)
+
+#### 1. Create a Slack App
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) → Create New App → From Scratch
+2. Name: `Pipeline Bot` (or whatever you like)
+3. Workspace: your Slack workspace
+
+#### 2. Enable Incoming Webhooks
+
+1. In the app settings → Incoming Webhooks → Activate
+2. Click "Add New Webhook to Workspace"
+3. Select the `#pipeline` channel
+4. Copy the webhook URL — it looks like `https://hooks.slack.com/services/T00000/B00000/XXXX`
+
+#### 3. Store the Webhook in GitHub Secrets
+
+```bash
+gh secret set SLACK_WEBHOOK_URL --repo suyashbhatia/CollegeOra-frontend
+# Paste the webhook URL when prompted
+```
+
+#### 4. (Optional) Enable Slash Commands
+
+For triggering workflows from Slack:
+
+1. In the Slack app settings → Slash Commands → Create New Command
+2. Add `/deploy`, `/sanity`, `/status` (details in Slash Commands section below)
+3. Request URL: a small handler (Vercel function or Slack Workflow Builder)
+
+### Notification Formats
+
+#### Production Deploy + Sanity Check
+
+```
+✅ Deployed to production (abc123)
+   Sanity check: 5/5 paths passing
+   Homepage: 200 (340ms) | Auth: 200 | Onboarding: 200
+```
+
+```
+🚨 PROD SANITY FAILED
+   Auth callback returning 503
+   Commit: abc123 by @suyashbhatia
+   → Review: github.com/suyashbhatia/CollegeOra-frontend/actions/runs/123
+```
+
+#### Security CRITICAL Finding
+
+```
+🔴 CRITICAL Security Finding on PR #18
+   "API route /api/users exposes SUPABASE_SERVICE_ROLE_KEY"
+   → Review: github.com/suyashbhatia/CollegeOra-frontend/pull/18
+```
+
+Only CRITICAL findings get posted. HIGH/MEDIUM/LOW stay as PR comments.
+
+#### Agent Blocked
+
+```
+🤖 Developer Agent stuck on #42 (Add Google OAuth)
+   "Unclear: should OAuth callback use server or client Supabase client?"
+   → Reply in issue: github.com/suyashbhatia/CollegeOra-frontend/issues/42
+```
+
+#### PR Ready for Merge
+
+```
+✅ PR #18 ready for merge
+   "feat: add Google OAuth to login page"
+   CI: ✅ | Review: ✅ | Security: ✅
+   → github.com/suyashbhatia/CollegeOra-frontend/pull/18
+```
+
+#### Weekly Sprint Digest (Sunday evening)
+
+```
+📊 Sprint 3 Summary
+   Done: 8 stories | In Progress: 2 | Blocked: 1
+   Agent success rate: 82% (9/11 PRs merged without revision)
+   API spend this week: $12.40
+   → Board: github.com/users/suyashbhatia/projects/1
+```
+
+### Workflow Integration
+
+Add a Slack notification step to existing workflows. The pattern is the same everywhere — a final step that fires on the condition you care about.
+
+#### Pattern: Add to `claude-sanity-check.yml`
+
+```yaml
+    - name: Notify Slack
+      if: always()
+      uses: slackapi/slack-github-action@v2.1.0
+      with:
+        webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+        webhook-type: incoming-webhook
+        payload: |
+          {
+            "text": "${{ job.status == 'success' && '✅' || '🚨' }} *Production Sanity Check: ${{ job.status }}*\nCommit: `${{ github.sha }}` by @${{ github.actor }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+          }
+```
+
+#### Pattern: Add to `claude-security-scan.yml`
+
+Post only on CRITICAL findings. The Claude agent writes its findings to `GITHUB_STEP_SUMMARY`. Parse for CRITICAL:
+
+```yaml
+    - name: Notify Slack on Critical
+      if: contains(steps.security-scan.outputs.summary, 'CRITICAL')
+      uses: slackapi/slack-github-action@v2.1.0
+      with:
+        webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+        webhook-type: incoming-webhook
+        payload: |
+          {
+            "text": "🔴 *CRITICAL Security Finding* on PR #${{ github.event.pull_request.number }}\n${{ github.event.pull_request.title }}\n<${{ github.event.pull_request.html_url }}|Review PR>"
+          }
+```
+
+#### Pattern: Add to `claude-pr-review.yml`
+
+Post when all checks pass (PR is ready for human merge):
+
+```yaml
+    - name: Notify PR Ready
+      if: success()
+      uses: slackapi/slack-github-action@v2.1.0
+      with:
+        webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+        webhook-type: incoming-webhook
+        payload: |
+          {
+            "text": "✅ *PR #${{ github.event.pull_request.number }} ready for merge*\n${{ github.event.pull_request.title }}\nCI: ✅ | Review: ✅ | Security: ✅\n<${{ github.event.pull_request.html_url }}|Open PR>"
+          }
+```
+
+#### New Workflow: Weekly Sprint Digest
+
+```yaml
+# .github/workflows/weekly-digest.yml
+name: Weekly Sprint Digest
+on:
+  schedule:
+    - cron: '0 18 * * 0'  # Sunday 6pm UTC
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect stats
+        id: stats
+        run: |
+          # Count issues by state
+          DONE=$(gh issue list --state closed --search "closed:>$(date -d '7 days ago' +%Y-%m-%d)" --json number | jq length)
+          IN_PROGRESS=$(gh issue list --label "claude-ready" --state open --json number | jq length)
+          BLOCKED=$(gh issue list --label "claude-blocked" --state open --json number | jq length)
+
+          # Count PRs merged this week
+          MERGED=$(gh pr list --state merged --search "merged:>$(date -d '7 days ago' +%Y-%m-%d)" --json number | jq length)
+
+          echo "done=$DONE" >> "$GITHUB_OUTPUT"
+          echo "in_progress=$IN_PROGRESS" >> "$GITHUB_OUTPUT"
+          echo "blocked=$BLOCKED" >> "$GITHUB_OUTPUT"
+          echo "merged=$MERGED" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post digest to Slack
+        uses: slackapi/slack-github-action@v2.1.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "📊 *Weekly Digest*\nDone: ${{ steps.stats.outputs.done }} stories | In Progress: ${{ steps.stats.outputs.in_progress }} | Blocked: ${{ steps.stats.outputs.blocked }}\nPRs merged: ${{ steps.stats.outputs.merged }}\n<https://github.com/${{ github.repository }}|View Repo>"
+            }
+```
+
+### Slash Commands (Optional)
+
+These let you trigger workflows from Slack. Two approaches:
+
+#### Option A: Slack Workflow Builder (No Code)
+
+1. In Slack → Tools → Workflow Builder → New Workflow
+2. Trigger: Slash command (`/sanity`)
+3. Step: Send a webhook (HTTP POST) to:
+   ```
+   https://api.github.com/repos/OWNER/REPO/actions/workflows/claude-sanity-check.yml/dispatches
+   ```
+   Headers: `Authorization: Bearer <GITHUB_PAT>`, `Content-Type: application/json`
+   Body: `{"ref": "main"}`
+4. Step: Send message to channel: "🔄 Sanity check triggered..."
+
+#### Option B: Vercel Edge Function (More Flexible)
+
+Create a tiny API route in your Next.js app that handles Slack's POST and dispatches GitHub workflows:
+
+```
+POST /api/slack/commands
+  → Validates Slack signing secret
+  → Parses command (/deploy, /sanity, /status)
+  → Triggers GitHub workflow_dispatch via API
+  → Returns 200 to Slack with confirmation
+```
+
+**Recommendation:** Start with Option A (Slack Workflow Builder). It's free, no code, and works today. Move to Option B only if you need custom logic.
+
+### What to Add to GitHub Secrets
+
+| Secret | Purpose | Where to Get It |
+|---|---|---|
+| `SLACK_WEBHOOK_URL` | Incoming webhook for `#pipeline` channel | Slack App → Incoming Webhooks |
+| `SLACK_SIGNING_SECRET` | (Only if using slash commands Option B) | Slack App → Basic Information |
+
+### Template Repo Changes
+
+Add to the template so every new project gets Slack wired in:
+
+1. Add `SLACK_WEBHOOK_URL` to the `.env.example` documentation
+2. Add Slack notification steps to all relevant workflows
+3. Add `weekly-digest.yml` workflow
+4. Add `SLACK_WEBHOOK_URL` to the setup script's "Remaining manual steps" output
+
+### Cost
+
+**$0.** Slack free tier supports incoming webhooks and slash commands. The `slackapi/slack-github-action` is free. GitHub Actions minutes are the same regardless.
+
+---
+
+## 12. Template Repository Setup
 
 ### One-Time Setup (Do This Once)
 
@@ -1294,7 +1559,7 @@ echo "  7. Create your first sprint stories"
 
 ---
 
-## 12. New Project Bootstrap (From Template)
+## 13. New Project Bootstrap (From Template)
 
 ### Step-by-Step for Every New Project
 
@@ -1327,7 +1592,7 @@ gh secret set ANTHROPIC_API_KEY
 
 ---
 
-## 13. Cost Breakdown
+## 14. Cost Breakdown
 
 ### Monthly Costs (Active Development)
 
@@ -1344,6 +1609,7 @@ gh secret set ANTHROPIC_API_KEY
 | **Claude API (Developer Agent)** | $20–50 | Depends on how many stories you delegate |
 | **Graphify graph updates** | $2–5 | ~$0.05–0.10 per incremental update, runs on merge to develop |
 | **Archon VPS (future)** | $0 (now) / $5–20 (later) | Only when you adopt Archon for stateful agents |
+| **Slack integration** | $0 | Free tier covers webhooks, slash commands, and Workflow Builder |
 | **Domain + DNS** | $12–15 | Annual, amortized |
 | **Total (now)** | **$222–375/mo** | |
 | **Total (with Archon, future)** | **$227–395/mo** | |
@@ -1358,7 +1624,7 @@ gh secret set ANTHROPIC_API_KEY
 
 ---
 
-## 14. Effectiveness Assessment
+## 15. Effectiveness Assessment
 
 ### What Works Well Today
 
@@ -1371,6 +1637,7 @@ gh secret set ANTHROPIC_API_KEY
 | **CI/CD pipeline** | Industry standard | GitHub Actions is battle-tested, nothing experimental here |
 | **Graphify knowledge graph** | Use now | Reduces agent token burn by 60-80% on architecture queries. Run `--update` after merges |
 | **Archon stateful agents** | Planned (future) | Adopt when stateless agents hit real memory/autonomy limits |
+| **Slack notifications** | Implement now | Single #pipeline channel — deploy results, critical security, agent-blocked, PR ready |
 
 ### What Requires Human Judgment
 
@@ -1413,4 +1680,9 @@ Knowledge graph:
   Query architecture:    claude "/graphify query 'What depends on auth?'"
   Find connections:      claude "/graphify path 'ComponentA' 'ComponentB'"
   View graph:            open graphify-out/graph.html
+
+Slack (from Slack):
+  /sanity                Run prod sanity check
+  /deploy staging        Trigger develop → staging PR
+  /status                Get sprint board summary
 ```
