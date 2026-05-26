@@ -1,0 +1,103 @@
+# Modular pipeline orchestrator (see docs/PIPELINE_PLAYBOOK.md §17 + docs/BUILD_ROADMAP.md).
+#
+# Stages are toggled at runtime via the `PIPELINE_CONFIG` GitHub Actions variable
+# (org default + optional repo override). Until that variable is set, this falls back to the
+# committed `pipeline.config.default.json`, so the pipeline works out of the box.
+#
+# Phase 1: stages run inline here. Phase 2 swaps each `run:` body for a reusable
+# `uses: suyashbhatia/.github/.github/workflows/<stage>.yml@v1` module.
+#
+# Branch protection should require ONLY the `gate` job — disabled stages skip, and `gate`
+# treats skipped jobs as pass, so turning a stage off never blocks a merge.
+
+name: Pipeline
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [develop, staging, main]
+
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    outputs:
+      cfg: ${{ steps.resolve.outputs.cfg }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: resolve
+        name: Resolve PIPELINE_CONFIG (variable, else default file)
+        run: |
+          CONFIG='${{ vars.PIPELINE_CONFIG }}'
+          if [ -z "$CONFIG" ]; then
+            echo "PIPELINE_CONFIG variable not set — falling back to pipeline.config.default.json"
+            CONFIG=$(cat pipeline.config.default.json)
+          fi
+          # Validate it is parseable JSON, then emit compact form for downstream `if:` gates.
+          echo "$CONFIG" | jq -e . > /dev/null
+          echo "cfg=$(echo "$CONFIG" | jq -c .)" >> "$GITHUB_OUTPUT"
+      - name: Record resolved config in run summary
+        run: |
+          {
+            echo "### Pipeline config for this run";
+            echo '```json';
+            echo '${{ steps.resolve.outputs.cfg }}' | jq .;
+            echo '```';
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  lint:
+    needs: config
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.lint.enabled }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: "npm" }
+      - run: npm ci
+      - run: npm run lint
+
+  typecheck:
+    needs: config
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.typecheck.enabled }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: "npm" }
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  test:
+    needs: config
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.test.enabled }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: "npm" }
+      - run: npm ci
+      - run: npm run test:coverage
+
+  build:
+    needs: config
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.build.enabled }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: "npm" }
+      - run: npm ci
+      - run: npm run build
+
+  # The ONLY required status check. Passes unless a stage that actually ran reported failure.
+  gate:
+    needs: [config, lint, typecheck, test, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any executed stage failed
+        run: |
+          echo '${{ toJSON(needs) }}' | jq -e '
+            to_entries | map(select(.value.result == "failure")) | length == 0
+          ' > /dev/null || { echo "::error::A required pipeline stage failed"; exit 1; }
+          echo "All enabled stages passed (skipped stages are intentionally disabled)."

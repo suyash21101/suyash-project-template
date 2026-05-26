@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://suyashbhatia/pipeline.schema.json",
+  "title": "PIPELINE_CONFIG",
+  "description": "Runtime control-plane config for the modular pipeline. Stored as the GitHub Actions variable PIPELINE_CONFIG (org default + optional repo override) and read by .github/workflows/pipeline.yml.",
+  "type": "object",
+  "required": ["stages", "deploy"],
+  "additionalProperties": false,
+  "properties": {
+    "stages": {
+      "type": "object",
+      "description": "One entry per pipeline stage. Every stage requires a boolean `enabled`.",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["enabled"],
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "coverage_min": { "type": "number", "minimum": 0, "maximum": 100 },
+          "threshold_kb": { "type": "number", "minimum": 0 },
+          "min_score": { "type": "number", "minimum": 0, "maximum": 100 },
+          "block_on": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"]
+          },
+          "model": { "type": "string", "enum": ["opus", "sonnet", "haiku"] },
+          "run_on": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": true
+      }
+    },
+    "deploy": {
+      "type": "object",
+      "required": ["mode"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["amplify", "fargate"] },
+        "migrate_before_traffic": { "type": "boolean" }
+      }
+    }
+  }
+}

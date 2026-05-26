@@ -22,6 +22,8 @@
 13. [New Project Bootstrap (From Template)](#13-new-project-bootstrap-from-template)
 14. [Cost Breakdown](#14-cost-breakdown)
 15. [Effectiveness Assessment](#15-effectiveness-assessment)
+16. [Recent Capabilities & How We Use Them (2026 H1)](#16-recent-capabilities--how-we-use-them-2026-h1)
+17. [Modular Pipeline Control](#17-modular-pipeline-control)
 
 ---
 
@@ -221,6 +223,8 @@ Agents split into two tiers based on where they run:
 **CI Agents (API key, pay-per-token):** Lightweight, automated agents that trigger on events (PRs, deploys, cron). These are review/scan agents — they read diffs, post comments, and cost pennies per run. Agents 1–5, 9–10.
 
 **Local Agents (Max plan, effectively unlimited):** Heavy agents that do real development work — planning, implementing, testing, documenting. These are the most expensive if run on API ($0.50–5.00/run), but **free on a Claude Max/Pro subscription** via Claude Code CLI. Agents 6–8.
+
+> **2026 billing change — read this.** Anthropic split `claude -p`, the Claude Code GitHub Actions, the Agent SDK, and third-party frameworks out of Pro/Max subscription quotas into a **separate API credit pool at standard API rates**. Practical consequences for this pipeline: (1) the CI agents _must_ be funded by `ANTHROPIC_API_KEY` — they were never on your subscription anyway, so nothing changes there; (2) only **interactive** local Claude Code sessions still draw on your Max plan. Don't try to route CI agents through a subscription — it isn't allowed, and the cost table in §14 already assumes API rates for CI.
 
 **Why this split matters:**
 
@@ -1728,6 +1732,187 @@ The pipeline this playbook describes doesn't replace engineering judgment — it
 
 ---
 
+## 16. Recent Capabilities & How We Use Them (2026 H1)
+
+> Features that shipped after the original playbook was written (Feb–May 2026), and the
+> specific role each one plays in this pipeline. Decisions and rationale are tracked in
+> `docs/SAMPLE_SETUP_LOG.md`.
+
+### 16.1 Local development as an agent team
+
+The local Developer Agent (Agent 6) is no longer a single conversation. Using Claude Code's
+**multi-agent orchestration** (public beta), `claude "Implement #42"` runs as an _orchestrator_
+that dispatches bounded subagents, each with its own context window:
+
+| Subagent      | Responsibility                                          |
+| ------------- | ------------------------------------------------------- |
+| Implementer   | Writes the feature code following CLAUDE.md + the graph |
+| Test-writer   | Authors unit/integration tests for the change           |
+| Self-reviewer | Reviews the diff against conventions before you see it  |
+
+The orchestrator owns planning and integration; you stay in the loop for architecture calls.
+
+**Outcomes:** Pass the story's Acceptance Criteria into the run as **Outcomes** so the team
+iterates until it self-verifies "done" instead of stopping at first pass.
+
+**Isolation & safety:** Run the team in a **worktree + native sandbox** (`/sandbox`,
+OS-level filesystem/network isolation). The dev server runs as a **background task** so it
+doesn't block the agents. **Checkpoints/Rewind** (`/rewind`, Esc-Esc) is your undo net —
+snapshots are taken before each edit, so a bad change is one keypress to revert.
+
+### 16.2 Local guardrail hooks
+
+The template ships a small, high-value set of Claude Code **hooks** in `settings.json`. These
+are deterministic (no token cost) and mirror the CI gates locally so problems surface before a push:
+
+1. **Branch-name check** — block work unless the branch name contains the issue ID (`feature/42-...`).
+2. **Protected-path guard** — block edits to generated files (`graphify-out/`, lockfiles).
+3. **Stop hook** — run lint + typecheck when a session stops; failures surface immediately.
+
+(Deliberately omitted for now: tests-before-stop and post-dependency security scans — added later if friction is acceptable.)
+
+### 16.3 Deep pre-prod review — `/ultrareview`
+
+`/ultrareview` runs a **multi-agent cloud review** of a branch or PR. It is heavier (and billed)
+compared to the lightweight per-PR `claude-pr-review.yml`, so it sits at a single, high-value gate:
+
+- **Per-PR (`→ develop`):** the fast `claude-pr-review.yml` runs, as before.
+- **Before promoting `staging → main`:** run **`/ultrareview <PR#>`** as the final pre-prod gate.
+
+It is user-triggered and billed — it cannot be launched from CI or by an agent. Treat it as a
+required line item on the release/promotion checklist.
+
+### 16.4 End-of-cycle QA — Codex computer use
+
+After deploying to **UAT (`staging`)** and before opening `staging → main`, run a
+**Codex computer-use browser agent** against the live UAT deploy. It clicks through critical
+flows (login, onboarding, and whatever the story touched), fills forms, inspects DOM, screenshots,
+and writes an issue summary. This is human-style verification that complements the scripted
+Playwright E2E suite — it catches things assertions don't.
+
+- **Now:** a manual step on the promotion checklist (mention `@Computer` / enable the Browser plugin in the Codex app).
+- **Later:** automate via `codex-action` in a workflow once it has proven its value. Codex reads
+  review/QA guidance from the nearest `AGENTS.md`, which this repo already has.
+
+### 16.5 Codex as a second PR reviewer (future toggle)
+
+Codex now does GitHub PR reviews (`@codex review`, flags only P0/P1, reads `AGENTS.md` guidelines).
+We run **Claude-only review for now**. If Claude starts missing correctness bugs, enable Codex as a
+second, correctness-focused reviewer alongside the Claude PR Reviewer — two models catch different
+classes of bug. This adds a second vendor key/bill and more comment volume, so it stays off until needed.
+
+### 16.6 Memory: Dreaming as a lightweight stand-in
+
+Claude's **Dreaming** (research preview) reorganizes a memory store — merging duplicates and
+replacing stale entries. It can cover part of what the planned Archon semantic-memory layer (§10)
+would do, without standing up a VPS. This does not replace Archon's autonomy/handoff features, but it
+pushes the "adopt Archon" trigger further out. Revisit when stateless agents demonstrably hit memory limits.
+
+### 16.7 Updated story lifecycle
+
+```
+issue (feature template) → groom → label claude-ready
+claude "Implement #42"  →  agent team (implementer + tester + self-reviewer), Outcomes-driven
+   →  PR to develop  →  CI + Claude review + security + regression  →  merge  →  graph updates
+develop → staging (UAT)
+   →  Codex computer-use QA on UAT deploy  →  /ultrareview <PR#>
+   →  staging → main (PROD)  →  sanity check  →  Done
+```
+
+---
+
+## 17. Modular Pipeline Control
+
+> Goal: each pipeline stage (lint, test, security, e2e, etc.) is an **independently toggleable,
+> composable, versioned module** — so a project can turn stages on/off without forking YAML, and
+> shared logic is fixed once and inherited everywhere.
+
+Today the CI is a set of standalone workflow files (`ci.yml`, `claude-pr-review.yml`, …). They are
+_loosely_ separable but there is no control plane to toggle or recombine them. This section defines
+that control plane, in four layers of increasing power.
+
+### 17.1 The four control mechanisms
+
+| #   | Mechanism                                                   | What it controls                                                                               | Cost to flip                                        |
+| --- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 1   | **Path filters** (`on.<event>.paths`)                       | A stage only fires when relevant files change (e.g. migration-safety on `prisma/**`, `sql/**`) | Edit YAML once                                      |
+| 2   | **Repo/Org variable flags** (`if: vars.ENABLE_X == 'true'`) | Whether a stage runs at all, per repo or org-wide                                              | Toggle in repo Settings → Variables, no code change |
+| 3   | **Per-PR skip labels** (`!contains(labels, 'skip-e2e')`)    | One-off bypass on a single PR                                                                  | Add/remove a label                                  |
+| 4   | **Reusable workflows** (`workflow_call`)                    | The stage's _implementation_, shared across all projects, versioned by tag                     | Bump the `@vN` reference                            |
+
+Layers compose: a reusable module (4) is invoked by a project, gated by a variable flag (2) and a
+path filter (1), with a label (3) as the manual escape hatch.
+
+### 17.2 Reusable modules + orchestrator
+
+Each stage becomes a reusable workflow living in the user-level **`suyashbhatia/.github`** repo
+(per §1 repo strategy), exposing typed `inputs`:
+
+```yaml
+# suyashbhatia/.github/.github/workflows/test.yml  (the module)
+on:
+  workflow_call:
+    inputs:
+      enabled: { type: boolean, default: true }
+      coverage_min: { type: number, default: 80 }
+jobs:
+  test:
+    if: ${{ inputs.enabled }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci && npm test -- --coverage.thresholds.lines=${{ inputs.coverage_min }}
+```
+
+A single orchestrator in each project repo composes the modules and applies the flags:
+
+```yaml
+# <project>/.github/workflows/pipeline.yml  (the composer)
+on: { pull_request: { types: [opened, synchronize] } }
+jobs:
+  lint: { uses: suyashbhatia/.github/.github/workflows/lint.yml@v1 }
+  test:
+    uses: suyashbhatia/.github/.github/workflows/test.yml@v1
+    with:
+      enabled: ${{ vars.ENABLE_TESTS != 'false' }}
+      coverage_min: 80
+  security:
+    if: ${{ vars.ENABLE_SECURITY_SCAN == 'true' }}
+    uses: suyashbhatia/.github/.github/workflows/claude-security-scan.yml@v1
+    secrets: inherit
+  e2e:
+    if: ${{ github.base_ref == 'staging' && !contains(github.event.pull_request.labels.*.name, 'skip-e2e') }}
+    uses: suyashbhatia/.github/.github/workflows/e2e.yml@v1
+```
+
+This is the whole point: **add a stage = add a `uses:` line; disable a stage = flip a variable;
+fix a stage everywhere = edit one module and bump the tag.**
+
+### 17.3 Required vs advisory
+
+Modularity and branch protection (§7) interact: a stage can _run_ but not _block_. Map them
+deliberately —
+
+- **Blocking on `main`:** lint, typecheck, test, build, security scan (the required status checks).
+- **Advisory (comments, never blocks):** regression analysis, Lighthouse/perf, accessibility.
+
+Make a stage advisory by simply not listing its check name in the branch's `required_status_checks`.
+
+### 17.4 Migration path (current → modular)
+
+1. Stand up `suyashbhatia/.github` with one reusable workflow per existing stage (lift the current
+   `ci.yml`, `claude-*.yml` bodies into `workflow_call` modules).
+2. Replace each project's standalone workflows with a single `pipeline.yml` orchestrator that
+   `uses:` the modules.
+3. Introduce `ENABLE_*` repo variables and wire the `if:` gates.
+4. Update branch-protection required-check names to match the orchestrator's job names.
+
+> **Status:** this section is the _design_. The reusable module files do not exist yet — authoring
+> them is part of standing up the `.github` repo (tracked in `SAMPLE_SETUP_LOG.md`), done alongside
+> the first real project bootstrap, not before.
+
+---
+
 ## Appendix: Quick Reference Card
 
 ```
@@ -1736,10 +1921,12 @@ Start a new project:     gh repo create X --template suyash-project-template --c
 
 Write a story:           gh issue create (use the feature template)
 Mark agent-ready:        gh issue edit 42 --add-label "claude-ready"
-Start agent on story:    claude "Implement issue #42"
+Start agent on story:    claude "Implement issue #42"   (runs as an agent team, §16.1)
 Check pipeline status:   gh pr checks <PR-number>
 View sprint board:       gh project view --owner <you>
 Deploy to staging:       Open PR: develop → staging
+UAT browser QA:          Codex computer-use agent on the UAT deploy (§16.4)
+Deep pre-prod review:    /ultrareview <PR-number>   (before staging → main, §16.3)
 Deploy to prod:          Open PR: staging → main
 Post-deploy check:       Automatic (sanity check workflow)
 
