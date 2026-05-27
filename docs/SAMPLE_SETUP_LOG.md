@@ -131,3 +131,22 @@ Notes / not done:
 - CODEOWNERS still references Supabase paths — valid for the current template; revisit at the AWS migration (Phase 4), not now.
 - Remaining ~12 modules (prisma-validate, bundle-size, claude-\*, dependency-audit, stale-pr-check, knowledge-graph, weekly-digest, aws-deploy) deferred until the slice is verified green on a real PR.
 - Smoke test (Stage E) pending: needs a PR run to confirm the modules resolve via `@v1` and `gate` behaves.
+
+### Phase 2 follow-up — Supabase removed, Prisma 7 fixed (2026-05-27)
+
+- Ripped out the dead Supabase scaffolding (no app code used it): removed `@supabase/*` deps, the empty `src/lib/supabase/`, the `NEXT_PUBLIC_SUPABASE_*` build env, the dead CODEOWNERS auth paths; reworded the Claude security/migration prompts to Cognito + Aurora RLS.
+- Fixed Prisma 7: the connection URL already lived in `prisma.config.ts`; removed the duplicate `url = env(...)` from `schema.prisma`. `build` now green; re-enabled the stage (deleted the temporary repo override variable). Full Pipeline run green incl. build.
+
+### Phase 3 — bootstrap tooling (Stage 1 done, 2026-05-27)
+
+Decisions (confirmed): dogfood on **this repo**; proceed on the Phase 2 **thin slice** (Stage F separate); **strictly AWS — no Vercel, no Supabase anywhere**.
+
+Stage 1 (bootstrap tooling made AWS-native + `gate`-aligned) — done:
+
+- `scripts/setup-branch-protection.sh`: required status check on main/staging/develop is now the single **`gate`** (was the old `ci.yml` check names — the core misalignment).
+- `scripts/setup-project.sh`: rewrote the manual steps — dropped Supabase/Vercel, point at `docs/AWS_INFRA_SETUP.md` (Aurora/Cognito/S3/Amplify-or-Fargate), added `PIPELINE_CONFIG` note, `gate` hint.
+- `CLAUDE.md` tech stack → Aurora + Cognito + Amplify/Fargate; conventions → server-only DB access + Cognito JWT → `app.user_id` RLS.
+- `.env.example` → AWS vars (DATABASE*URL/COGNITO*\*/S3). `.gitignore` → `.amplify` (dropped `.vercel`). `claude-sanity-check.yml` → AWS deployment comment.
+- `docs/PIPELINE_PLAYBOOK.md`: §8 rewritten to AWS-native; env/cost/checklist tables, security prompt, worked examples, Slack handler, and the Archon section all de-Vercel'd / de-Supabase'd (Archon now points at Aurora pgvector). Migration-mapping refs in `AWS_INFRA_SETUP.md` intentionally kept (they document what we moved _from_).
+
+Stage 2+ (outward — pending user): merge PR #1 → `main`, then run `setup-project.sh` on this repo (develop/staging, `gate` protection, labels, sprint board), then `/graphify --mode deep`.

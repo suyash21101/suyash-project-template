@@ -14,7 +14,7 @@
 5. [Sprint Board Configuration](#5-sprint-board-configuration)
 6. [Story Writing Guide for Agent Compatibility](#6-story-writing-guide-for-agent-compatibility)
 7. [Branch Protection Rules](#7-branch-protection-rules)
-8. [Environment Setup (Supabase + Vercel)](#8-environment-setup-supabase--vercel)
+8. [Environment Setup (AWS-native)](#8-environment-setup-aws-native)
 9. [Knowledge Layer — Graphify](#9-knowledge-layer--graphify)
 10. [Stateful Agent Layer — Archon (Future)](#10-stateful-agent-layer--archon-future)
 11. [Slack Integration — Pipeline Notifications & Commands](#11-slack-integration--pipeline-notifications--commands)
@@ -34,7 +34,7 @@
 | Repo                      | Purpose                                                                                                                                                       | Template?             |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | `suyash-project-template` | The reusable template. Contains all CI/CD workflows, issue templates, PR templates, setup scripts, base CLAUDE.md. You never deploy this — you clone from it. | Yes (GitHub Template) |
-| `CollegeOra-frontend`     | The Next.js application. All product code, tests, Prisma schema, Supabase config. This is your deployable project.                                            | Created from template |
+| `CollegeOra-frontend`     | The Next.js application. All product code, tests, Prisma schema, AWS app config. This is your deployable project.                                             | Created from template |
 | Future projects           | Any new project you start. Created from the template in one click. Inherits all pipeline config.                                                              | Created from template |
 
 ### Why Not More Repos?
@@ -117,20 +117,20 @@ Production
 
 ### Three Environments
 
-| Environment | Branch    | Vercel Deployment   | Database                            | Purpose                                                |
-| ----------- | --------- | ------------------- | ----------------------------------- | ------------------------------------------------------ |
-| **INT**     | `develop` | Auto preview deploy | Supabase Project: `collegeora-int`  | Integration. Features land here first. Unstable is OK. |
-| **UAT**     | `staging` | Auto preview deploy | Supabase Project: `collegeora-uat`  | User acceptance testing. Stable. Mirrors prod schema.  |
-| **PROD**    | `main`    | Production deploy   | Supabase Project: `collegeora-prod` | Live. Only tested, reviewed code reaches here.         |
+| Environment | Branch    | Compute (Amplify/Fargate)  | Database                           | Purpose                                                |
+| ----------- | --------- | -------------------------- | ---------------------------------- | ------------------------------------------------------ |
+| **INT**     | `develop` | INT app env                | Aurora cluster: `projectname-int`  | Integration. Features land here first. Unstable is OK. |
+| **UAT**     | `staging` | UAT app env                | Aurora cluster: `projectname-uat`  | User acceptance testing. Stable. Mirrors prod schema.  |
+| **PROD**    | `main`    | PROD app env (human-gated) | Aurora cluster: `projectname-prod` | Live. Only tested, reviewed code reaches here.         |
 
 ### Database Parity
 
-All three Supabase projects must have identical schemas. Enforce this by:
+All three Aurora clusters must have identical schemas. Enforce this by:
 
 1. All schema changes go through `sql/` migration files (numbered: `001-`, `002-`, etc.)
 2. CI validates that the Prisma schema matches the SQL migrations
 3. The same migration scripts run against all three databases (INT first, then UAT, then PROD)
-4. Never make manual schema changes in the Supabase dashboard — always through migration files
+4. Never make manual schema changes in the AWS console — always through migration files
 
 ---
 
@@ -297,13 +297,13 @@ jobs:
 **Trigger:** `pull_request` opened/synchronized
 **Action:** Scans for:
 
-- SQL injection (especially raw Supabase queries)
+- SQL injection (especially Prisma raw queries / hand-written SQL)
 - XSS in React components (dangerouslySetInnerHTML, unescaped user input)
 - Auth bypass (missing middleware checks, exposed API routes)
 - CSRF vulnerabilities
 - Secrets in code (API keys, tokens, passwords)
 - Insecure dependencies
-- RLS policy gaps (Supabase Row Level Security)
+- RLS policy gaps (Postgres Row Level Security)
 - SSRF in server components
 - Open redirect vulnerabilities
 
@@ -312,10 +312,10 @@ jobs:
 **Prompt focus:**
 
 ```
-You are a security engineer reviewing a PR for a Next.js + Supabase app.
-The app uses Supabase Auth with RLS policies. Check:
+You are a security engineer reviewing a PR for a Next.js app on AWS.
+The app uses Amazon Cognito for auth and Aurora PostgreSQL with RLS policies. Check:
 1. Are there any API routes missing auth checks?
-2. Are Supabase queries using the correct client (server vs anon)?
+2. Is the DB session scoped to the request user (app.user_id) so RLS applies?
 3. Is user input sanitized before database operations?
 4. Are there any secrets or tokens in the code?
 5. Do new database operations have corresponding RLS policies?
@@ -755,13 +755,13 @@ Example: Add Google OAuth button to login page
 [Which part of the app does this touch? Name specific files or directories.]
 
 The onboarding flow lives in `src/app/onboarding/`. The login page is
-`src/app/page.tsx`. Supabase Auth is configured in `src/lib/supabase/`.
+`src/app/page.tsx`. Cognito auth is configured in `src/lib/auth/`.
 The design mockup is at `Screens for onboarding/login.png`.
 
 ## Acceptance Criteria
 
 - [ ] Google OAuth button renders on the login page
-- [ ] Clicking initiates Supabase `signInWithOAuth({ provider: 'google' })`
+- [ ] Clicking initiates the Cognito hosted-UI / IdP sign-in for Google
 - [ ] Successful auth redirects to `/onboarding/welcome`
 - [ ] Failed auth shows error state (not a crash)
 - [ ] Button follows the design in the referenced screenshot
@@ -769,7 +769,7 @@ The design mockup is at `Screens for onboarding/login.png`.
 
 ## Technical Notes
 
-- Use `@supabase/ssr` `createClient` for server-side auth
+- Use the Cognito server client for server-side auth (validate the JWT, set the DB session user)
 - Follow component patterns in `src/components/` (see `primary-button.tsx`)
 - Use Material Design 3 color tokens from `globals.css`
 - The auth callback route already exists at `src/app/auth/callback/route.ts`
@@ -805,7 +805,7 @@ Example: Login redirect loops when session cookie is expired
 ## Steps to Reproduce
 
 1. Log in successfully
-2. Wait for session to expire (or clear the `sb-` cookies manually)
+2. Wait for session to expire (or clear the session cookies manually)
 3. Navigate to `/dashboard`
 4. Observe: page redirects to `/` which redirects back to `/dashboard` infinitely
 
@@ -820,7 +820,7 @@ Infinite redirect loop between `/` and `/dashboard`.
 ## Context
 
 - Middleware: `src/middleware.ts`
-- Auth check: `src/lib/supabase/middleware.ts`
+- Auth check: `src/lib/auth/middleware.ts`
 - Session utility: `src/lib/session.ts`
 
 ## Acceptance Criteria
@@ -945,62 +945,45 @@ done
 
 ---
 
-## 8. Environment Setup (Supabase + Vercel)
+## 8. Environment Setup (AWS-native)
 
-### Supabase — Three Projects
+This stack is **strictly AWS** — Aurora PostgreSQL + Cognito + S3, hosted on Amplify Hosting or ECS
+Fargate. The full reference (accounts, VPC, OIDC, per-service setup, RLS migration) lives in
+**`docs/AWS_INFRA_SETUP.md`**; this section is just the per-environment summary.
 
-| Project | Name               | Plan | Cost   |
-| ------- | ------------------ | ---- | ------ |
-| INT     | `projectname-int`  | Free | $0     |
-| UAT     | `projectname-uat`  | Free | $0     |
-| PROD    | `projectname-prod` | Pro  | $25/mo |
+### Three environments
 
-**Setup steps:**
+| Env  | Branch    | Aurora cluster     | Compute (Amplify or Fargate)      |
+| ---- | --------- | ------------------ | --------------------------------- |
+| INT  | `develop` | `projectname-int`  | INT app env                       |
+| UAT  | `staging` | `projectname-uat`  | UAT app env                       |
+| PROD | `main`    | `projectname-prod` | PROD app env (human-gated deploy) |
 
-1. Go to `app.supabase.com` → New Project for each environment
-2. Name them consistently: `collegeora-int`, `collegeora-uat`, `collegeora-prod`
-3. Use the same region for all three (minimize latency differences)
-4. Run `sql/001-full-schema.sql` in each project's SQL editor
-5. Configure auth providers (Google, Apple) in each project
-   - INT/UAT: Use test OAuth credentials
-   - PROD: Use production OAuth credentials
-6. Note down the project URL and anon key for each
+**Setup (per env, via `docs/AWS_INFRA_SETUP.md`):**
 
-### Vercel — Environment Variables Per Branch
+1. Stand up Aurora PostgreSQL (Serverless v2); run numbered `sql/0NN-*.sql` migrations via the migration job (§14).
+2. Create a Cognito User Pool; wire Google/Apple as IdPs (test creds for INT/UAT, prod creds for PROD).
+3. Create the S3 bucket(s); set bucket policy + CORS.
+4. Configure app config per env (set in the Amplify console or the Fargate task definition, **not** committed):
+   `DATABASE_URL`, `COGNITO_*`, `S3_BUCKET`, `AWS_REGION`, `NEXT_PUBLIC_*`.
+5. Deploys are keyless via **GitHub OIDC → IAM role** (`AWS_INFRA_SETUP.md` §9); PROD/UAT go through
+   a GitHub Environment with a required human reviewer.
 
-In Vercel project settings → Environment Variables:
-
-| Variable                        | Production (`main`)              | Preview (`staging`)             | Preview (`develop`)             |
-| ------------------------------- | -------------------------------- | ------------------------------- | ------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | `https://xxx.supabase.co` (PROD) | `https://yyy.supabase.co` (UAT) | `https://zzz.supabase.co` (INT) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | PROD anon key                    | UAT anon key                    | INT anon key                    |
-| `DATABASE_URL`                  | PROD connection string           | UAT connection string           | INT connection string           |
-| `SUPABASE_SERVICE_ROLE_KEY`     | PROD service key                 | UAT service key                 | INT service key                 |
-
-**Vercel branch mapping:**
-
-- Production domain → `main` branch
-- `staging.projectname.vercel.app` → `staging` branch (configure in Vercel)
-- Preview deploys → all other branches (auto)
-
-To make Vercel use different env vars for `staging` vs other preview branches, use Vercel's "Git Branch" env var scoping:
-
-1. Add the variable
-2. Uncheck "Production"
-3. Check "Preview"
-4. Set "Git Branch" to `staging`
-5. Repeat for `develop`
-
-### `.env.example` (Included in Template)
+### `.env.example` (included in template)
 
 ```bash
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+# Database — Aurora PostgreSQL (via Prisma)
+DATABASE_URL=postgresql://app:password@your-cluster.cluster-xxxx.region.rds.amazonaws.com:5432/appdb
 
-# Database (Prisma)
-DATABASE_URL=postgresql://postgres:password@db.your-project.supabase.co:5432/postgres
+# Auth — Amazon Cognito
+COGNITO_USER_POOL_ID=region_xxxxxxxxx
+COGNITO_CLIENT_ID=your-app-client-id
+COGNITO_CLIENT_SECRET=your-app-client-secret
+COGNITO_ISSUER=https://cognito-idp.region.amazonaws.com/region_xxxxxxxxx
+
+# Storage — S3
+S3_BUCKET=your-app-assets-bucket
+AWS_REGION=us-east-1
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -1051,10 +1034,10 @@ Only processes changed files. Fast and cheap.
 
 ```bash
 # Ask a question about architecture
-claude "/graphify query 'What components depend on Supabase auth?'"
+claude "/graphify query 'What components depend on Cognito auth?'"
 
 # Find the shortest path between two concepts
-claude "/graphify path 'LoginPage' 'SupabaseClient'"
+claude "/graphify path 'LoginPage' 'CognitoClient'"
 
 # BFS/DFS exploration
 claude "/graphify query 'What does the onboarding flow touch?' --mode bfs"
@@ -1162,19 +1145,19 @@ Add to the template so every new project gets Graphify wired in:
 
 [Archon](https://github.com/coleam00/archon) by Cole Medin is an open-source AI agent framework that provides:
 
-- **Persistent memory** via Supabase vector storage
+- **Persistent memory** via Postgres + pgvector storage (point it at our Aurora cluster — no Supabase)
 - **Multi-agent orchestration** with handoffs between agents
 - **MCP integration** for tool access
 - **Self-hosted agent runtime** — agents run on your infrastructure, not limited to GitHub Actions' 6-hour ceiling
 
 ### Why Not Now
 
-| Concern                          | Detail                                                                      |
-| -------------------------------- | --------------------------------------------------------------------------- |
-| **Complexity**                   | Adds hosting (Docker/VPS), Supabase vector config, agent runtime management |
-| **Cost**                         | VPS hosting ($5-20/mo) + same LLM costs + engineering time to set up        |
-| **Diminishing returns early on** | Your current pipeline is stateless and that's fine for <50 stories          |
-| **Dependency risk**              | Archon is evolving rapidly; locking in now means churn later                |
+| Concern                          | Detail                                                                             |
+| -------------------------------- | ---------------------------------------------------------------------------------- |
+| **Complexity**                   | Adds hosting (Docker/Fargate), pgvector config on Aurora, agent runtime management |
+| **Cost**                         | VPS hosting ($5-20/mo) + same LLM costs + engineering time to set up               |
+| **Diminishing returns early on** | Your current pipeline is stateless and that's fine for <50 stories                 |
+| **Dependency risk**              | Archon is evolving rapidly; locking in now means churn later                       |
 
 ### When to Adopt Archon
 
@@ -1221,7 +1204,7 @@ Trigger any **two** of these conditions:
 ```
 
 - **Graphify** = structural memory (what calls what, file dependencies, component relationships). Extracted from code. Updated after merges.
-- **Archon's Supabase vectors** = semantic memory (past decisions, resolved bugs, design rationale, sprint context). Accumulated over time from agent runs.
+- **Archon's pgvector store (on Aurora)** = semantic memory (past decisions, resolved bugs, design rationale, sprint context). Accumulated over time from agent runs.
 
 #### Phased Rollout
 
@@ -1244,7 +1227,7 @@ Trigger any **two** of these conditions:
      │   ├── developer.py
      │   ├── reviewer.py
      │   └── orchestrator.py
-     └── .env  # Supabase + Anthropic credentials
+     └── .env  # Aurora (pgvector) + Anthropic credentials
    ```
 
 2. **Migrate agents one at a time:**
@@ -1254,7 +1237,7 @@ Trigger any **two** of these conditions:
 
 3. **Wire up the memory layer:**
    - Archon agents read `graphify-out/graph.json` for structural context (replaces file exploration)
-   - Archon stores semantic memories in Supabase vectors (decisions, past bugs, rationale)
+   - Archon stores semantic memories in Aurora pgvector (decisions, past bugs, rationale)
    - Each agent run starts by querying both layers before doing any work
 
 4. **Enable autonomous story pickup:**
@@ -1264,13 +1247,13 @@ Trigger any **two** of these conditions:
 
 ### Cost Impact
 
-| Item                    | Current (Stateless)       | With Archon                                                          |
-| ----------------------- | ------------------------- | -------------------------------------------------------------------- |
-| Agent LLM costs         | Same                      | Same                                                                 |
-| VPS for Archon runtime  | $0                        | $5-20/mo                                                             |
-| Supabase vector storage | $0 (included in Pro plan) | $0                                                                   |
-| Setup time              | 0                         | ~1-2 days                                                            |
-| **Net benefit**         | —                         | Agents make fewer mistakes, work autonomously, remember past context |
+| Item                      | Current (Stateless) | With Archon                                                          |
+| ------------------------- | ------------------- | -------------------------------------------------------------------- |
+| Agent LLM costs           | Same                | Same                                                                 |
+| VPS for Archon runtime    | $0                  | $5-20/mo                                                             |
+| pgvector storage (Aurora) | $0 (same cluster)   | negligible (shares the app's Aurora)                                 |
+| Setup time                | 0                   | ~1-2 days                                                            |
+| **Net benefit**           | —                   | Agents make fewer mistakes, work autonomously, remember past context |
 
 ### What NOT to Do
 
@@ -1338,7 +1321,7 @@ For triggering workflows from Slack:
 
 1. In the Slack app settings → Slash Commands → Create New Command
 2. Add `/deploy`, `/sanity`, `/status` (details in Slash Commands section below)
-3. Request URL: a small handler (Vercel function or Slack Workflow Builder)
+3. Request URL: a small handler (AWS Lambda + API Gateway, or Slack Workflow Builder)
 
 ### Notification Formats
 
@@ -1361,7 +1344,7 @@ For triggering workflows from Slack:
 
 ```
 🔴 CRITICAL Security Finding on PR #18
-   "API route /api/users exposes SUPABASE_SERVICE_ROLE_KEY"
+   "API route /api/users exposes COGNITO_CLIENT_SECRET"
    → Review: github.com/suyashbhatia/CollegeOra-frontend/pull/18
 ```
 
@@ -1371,7 +1354,7 @@ Only CRITICAL findings get posted. HIGH/MEDIUM/LOW stay as PR comments.
 
 ```
 🤖 Developer Agent stuck on #42 (Add Google OAuth)
-   "Unclear: should OAuth callback use server or client Supabase client?"
+   "Unclear: should the OAuth callback validate the Cognito JWT server-side or client-side?"
    → Reply in issue: github.com/suyashbhatia/CollegeOra-frontend/issues/42
 ```
 
@@ -1508,9 +1491,9 @@ These let you trigger workflows from Slack. Two approaches:
    Body: `{"ref": "main"}`
 4. Step: Send message to channel: "🔄 Sanity check triggered..."
 
-#### Option B: Vercel Edge Function (More Flexible)
+#### Option B: AWS Lambda (or a Next.js API route) — More Flexible
 
-Create a tiny API route in your Next.js app that handles Slack's POST and dispatches GitHub workflows:
+Create a tiny handler — an AWS Lambda behind API Gateway, or an API route in your Next.js app — that handles Slack's POST and dispatches GitHub workflows:
 
 ```
 POST /api/slack/commands
@@ -1621,9 +1604,9 @@ echo ""
 echo "=== Setup Complete ==="
 echo ""
 echo "Remaining manual steps:"
-echo "  1. Create 3 Supabase projects (int, uat, prod)"
-echo "  2. Run your SQL migrations on each"
-echo "  3. Configure Vercel environment variables per branch"
+echo "  1. Stand up AWS infra per env (Aurora + Cognito + S3 + Amplify/Fargate) — see docs/AWS_INFRA_SETUP.md"
+echo "  2. Run your SQL migrations on each Aurora cluster (INT -> UAT -> PROD)"
+echo "  3. Set per-env app config (DATABASE_URL, COGNITO_*, S3_BUCKET, NEXT_PUBLIC_*) in Amplify/Fargate"
 echo "  4. Add ANTHROPIC_API_KEY to GitHub repo secrets"
 echo "  5. Update CLAUDE.md with project-specific details"
 echo "  6. Run: claude '/graphify . --mode deep' to generate initial knowledge graph"
@@ -1655,8 +1638,8 @@ gh secret set ANTHROPIC_API_KEY
 # 5. Update CLAUDE.md with project-specific info
 #    (tech stack, conventions, design system, etc.)
 
-# 6. Create Supabase projects and configure Vercel env vars
-#    (follow Section 8 of this playbook)
+# 6. Stand up AWS infra (Aurora + Cognito + S3 + Amplify/Fargate) and set per-env config
+#    (follow Section 8 of this playbook + docs/AWS_INFRA_SETUP.md)
 
 # 7. Start writing stories and building
 ```
@@ -1669,23 +1652,23 @@ gh secret set ANTHROPIC_API_KEY
 
 ### Monthly Costs (Active Development)
 
-| Item                                  | Cost                     | Notes                                                           |
-| ------------------------------------- | ------------------------ | --------------------------------------------------------------- |
-| **Supabase**                          | $25                      | 2 free projects (INT, UAT) + 1 Pro (PROD)                       |
-| **Vercel Pro**                        | $20                      | Needed for team features + preview deploy controls              |
-| **GitHub**                            | $0–4                     | Free for public, $4/user/mo for private Teams                   |
-| **Claude Max Plan**                   | $100–200                 | Your interactive development sessions                           |
-| **Claude API (PR Review)**            | $15–25                   | ~50 PRs/mo × $0.30–0.50 avg                                     |
-| **Claude API (Security Scan)**        | $10–20                   | ~50 PRs/mo × $0.20–0.40 avg                                     |
-| **Claude API (Regression)**           | $10–20                   | ~30 PRs/mo × $0.30–0.60 avg                                     |
-| **Claude API (Sanity + Cron agents)** | $5–15                    | Low frequency, small prompts                                    |
-| **Claude API (Developer Agent)**      | $20–50                   | Depends on how many stories you delegate                        |
-| **Graphify graph updates**            | $2–5                     | ~$0.05–0.10 per incremental update, runs on merge to develop    |
-| **Archon VPS (future)**               | $0 (now) / $5–20 (later) | Only when you adopt Archon for stateful agents                  |
-| **Slack integration**                 | $0                       | Free tier covers webhooks, slash commands, and Workflow Builder |
-| **Domain + DNS**                      | $12–15                   | Annual, amortized                                               |
-| **Total (now)**                       | **$222–375/mo**          |                                                                 |
-| **Total (with Archon, future)**       | **$227–395/mo**          |                                                                 |
+| Item                                          | Cost                     | Notes                                                                                                                              |
+| --------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **AWS (Aurora Serverless v2 + Cognito + S3)** | $40–90                   | Aurora scales near-zero when idle; Cognito free < 50k MAU; S3 pennies. INT/UAT small, PROD bears most. See docs/AWS_INFRA_SETUP.md |
+| **AWS (Amplify Hosting or Fargate)**          | $10–40                   | Amplify build+host, or a small Fargate task per env                                                                                |
+| **GitHub**                                    | $0–4                     | Free for public, $4/user/mo for private Teams                                                                                      |
+| **Claude Max Plan**                           | $100–200                 | Your interactive development sessions                                                                                              |
+| **Claude API (PR Review)**                    | $15–25                   | ~50 PRs/mo × $0.30–0.50 avg                                                                                                        |
+| **Claude API (Security Scan)**                | $10–20                   | ~50 PRs/mo × $0.20–0.40 avg                                                                                                        |
+| **Claude API (Regression)**                   | $10–20                   | ~30 PRs/mo × $0.30–0.60 avg                                                                                                        |
+| **Claude API (Sanity + Cron agents)**         | $5–15                    | Low frequency, small prompts                                                                                                       |
+| **Claude API (Developer Agent)**              | $20–50                   | Depends on how many stories you delegate                                                                                           |
+| **Graphify graph updates**                    | $2–5                     | ~$0.05–0.10 per incremental update, runs on merge to develop                                                                       |
+| **Archon VPS (future)**                       | $0 (now) / $5–20 (later) | Only when you adopt Archon for stateful agents                                                                                     |
+| **Slack integration**                         | $0                       | Free tier covers webhooks, slash commands, and Workflow Builder                                                                    |
+| **Domain + DNS**                              | $12–15                   | Annual, amortized                                                                                                                  |
+| **Total (now)**                               | **$227–460/mo**          | AWS is usage-based, so the low end holds when INT/UAT idle                                                                         |
+| **Total (with Archon, future)**               | **$232–480/mo**          |                                                                                                                                    |
 
 ### Comparison
 

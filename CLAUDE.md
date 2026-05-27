@@ -7,9 +7,9 @@
 
 - **Framework:** <!-- e.g., Next.js 16 (App Router, TypeScript) -->
 - **Styling:** <!-- e.g., Tailwind CSS v4 -->
-- **Database:** <!-- e.g., Supabase (PostgreSQL) + Prisma ORM -->
-- **Auth:** <!-- e.g., Supabase Auth (Google, Apple OAuth) -->
-- **Hosting:** <!-- e.g., Vercel -->
+- **Database:** <!-- e.g., Aurora PostgreSQL (Serverless v2) + Prisma ORM -->
+- **Auth:** <!-- e.g., Amazon Cognito (Google, Apple via IdP) -->
+- **Hosting:** <!-- e.g., AWS Amplify Hosting (or ECS Fargate) -->
 
 ## Commands
 
@@ -37,9 +37,9 @@ src/
 - Every new module under `src/lib/` ships with unit tests; coverage thresholds are enforced (see `vitest.config.ts`) and PRs that drop below them fail CI
 - Test files live beside their source: `my-helper.ts` → `my-helper.test.ts`
 - All database changes go through `sql/` migration files (numbered: 001-, 002-, etc.)
-- Never make manual schema changes in Supabase dashboard
-- Use the Supabase server client (`src/lib/supabase/server.ts`) in Server Components and API routes
-- Use the Supabase browser client (`src/lib/supabase/client.ts`) only in Client Components
+- Never make manual schema changes in the AWS console or directly against the database — migrations only
+- Reach the database (Aurora via Prisma) only from server code (Server Components, API routes, Server Actions); never from Client Components
+- On each request, validate the Cognito JWT server-side and scope the DB session to the user (`SET LOCAL app.user_id = '<cognito-sub>'`) so Postgres RLS applies — see `docs/AWS_INFRA_SETUP.md` §5
 
 ## Environments
 

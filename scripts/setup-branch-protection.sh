@@ -23,6 +23,11 @@ git checkout "$CURRENT"
 echo ""
 echo "Applying branch protection rules..."
 
+# The modular pipeline (.github/workflows/pipeline.yml) exposes a single `gate` job that
+# aggregates every stage: skipped/disabled stages count as pass, so toggling a stage off never
+# blocks a merge. `gate` is therefore the ONLY required status check on every branch — the
+# review/strictness gradient below is what differs.
+
 # main — strictest
 echo "  Protecting main..."
 gh api "repos/$REPO/branches/main/protection" \
@@ -36,14 +41,7 @@ gh api "repos/$REPO/branches/main/protection" \
   },
   "required_status_checks": {
     "strict": true,
-    "contexts": [
-      "Lint",
-      "Type Check",
-      "Unit Tests",
-      "Build",
-      "Prisma Validate",
-      "Claude Security Scan"
-    ]
+    "contexts": ["gate"]
   },
   "enforce_admins": false,
   "restrictions": null,
@@ -67,11 +65,7 @@ gh api "repos/$REPO/branches/staging/protection" \
   },
   "required_status_checks": {
     "strict": true,
-    "contexts": [
-      "Lint",
-      "Type Check",
-      "Build"
-    ]
+    "contexts": ["gate"]
   },
   "enforce_admins": false,
   "restrictions": null,
@@ -95,11 +89,7 @@ gh api "repos/$REPO/branches/develop/protection" \
   },
   "required_status_checks": {
     "strict": false,
-    "contexts": [
-      "Lint",
-      "Type Check",
-      "Build"
-    ]
+    "contexts": ["gate"]
   },
   "enforce_admins": false,
   "restrictions": null,

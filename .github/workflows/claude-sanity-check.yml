@@ -1,7 +1,7 @@
 name: Post-Deploy Sanity Check
 
 on:
-  # Trigger after Vercel deployment succeeds
+  # Trigger after a deployment succeeds (the AWS deploy workflow creates a GitHub Deployment).
   deployment_status:
 
   # Also allow manual trigger for testing
