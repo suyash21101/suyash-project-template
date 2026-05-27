@@ -40,7 +40,7 @@ setup steps once we run them. The pipeline reference itself lives in
 - [ ] **RLS migration:** rewrite all Supabase `auth.uid()` policies to Postgres `current_setting('app.user_id')` — main porting cost from Supabase. See §5.
 - [ ] Agent-team subagent definitions: exact roles/tools/models (defer until we author them).
 - [ ] Author the actual `settings.json` hooks (branch-name, protected-path, stop) — not yet written, only specified.
-- [x] Stand up the `suyash21101/.github` repo with reusable workflows. **Phase 2 thin slice done (2026-05-27):** repo created (private), 4 modules live at `@v1`, pipeline.yml rewired. Remaining ~12 modules + `aws-deploy.yml` deferred. **Checklist: `docs/GITHUB_DOTFILES_REPO_CHECKLIST.md`**.
+- [x] Stand up the `suyash21101/.github` repo with reusable workflows. **Phase 2 thin slice done (2026-05-27):** repo created (public — a public consumer can't use a private repo's reusable workflows), 4 modules live at `@v1`, pipeline.yml rewired. Remaining ~12 modules + `aws-deploy.yml` deferred. **Checklist: `docs/GITHUB_DOTFILES_REPO_CHECKLIST.md`**.
 - [ ] First real bootstrap: create a repo from the template + run `setup-project.sh` (deferred, "in some time").
 - [ ] **Integrations & access** documented in `BUILD_ROADMAP.md` (2026-05-26): GitHub App for the control UI, OIDC for CI→AWS, AWS SSO + optional AWS MCP for local agents, GitHub Environments with prod reviewer, MCP servers, Budgets/alarms, Dependabot. Agent AWS rule: read-all + write-INT-only, never autonomous prod write.
 - [ ] Conversation summary + full question list captured in `docs/CONVERSATION_SUMMARY.md` (2026-05-26).
@@ -116,11 +116,11 @@ Known issues / not done:
 
 ### Phase 2 — reusable workflow modules (2026-05-27)
 
-Decisions (confirmed): owner **`suyash21101`** (same account as consumer repos — required for `uses:`/`secrets: inherit`); repo **private**; **thin-slice-first** sequencing.
+Decisions (confirmed): owner **`suyash21101`** (same account as consumer repos — required for `uses:`/`secrets: inherit`); repo **public** (corrected from the initial private choice — the template repo is public, and a public repo cannot consume a private repo's reusable workflows); **thin-slice-first** sequencing.
 
 Done:
 
-- Created `suyash21101/.github` (private). Enabled cross-repo Actions access (`actions/permissions/access` = `user`) so consumer repos can reference the private modules.
+- Created `suyash21101/.github`. Initially private with cross-repo Actions access (`actions/permissions/access` = `user`), but the public template repo could not resolve the private modules (startup failure), so **flipped `.github` to public**. Modules carry no secrets, so public is safe.
 - Authored 4 `workflow_call` modules in `suyash21101/.github/.github/workflows/`: `lint.yml`, `typecheck.yml`, `test.yml` (takes `coverage_min`, overrides the consumer's vitest thresholds so `PIPELINE_CONFIG` governs the gate), `build.yml`. Pushed `main` + tags `v1.0.0` and moving `v1`.
 - Rewired this repo's `.github/workflows/pipeline.yml`: the 4 stage jobs now `uses:` the modules `@v1`; `config` + `gate` jobs unchanged (skip-is-pass / fail-is-block contract preserved at the job level).
 - Cleanup: corrected `suyashbhatia/.github` → `suyash21101/.github` across docs; `pipeline.schema.json` `$id`; CODEOWNERS handle `@suyashbhatia` → `@suyash21101`.
