@@ -4,8 +4,13 @@
 # (org default + optional repo override). Until that variable is set, this falls back to the
 # committed `pipeline.config.default.json`, so the pipeline works out of the box.
 #
-# Phase 2: each stage delegates to a reusable module in suyash21101/.github, pinned to @v1.
-# Stage bodies live there; this file only orchestrates (resolve config, gate on results).
+# Each stage delegates to a reusable module in suyash21101/.github, pinned to @v1.1.1.
+# Stage bodies live there; this file only orchestrates (resolve config, detect changes, gate).
+#
+# Gated vs advisory (PIPELINE_PLAYBOOK §17.3):
+#   - Gated stages are listed in `gate.needs`; a failure there fails the one required check.
+#   - Advisory stages (pr_review, regression, bundle_size) run and comment but are NOT in
+#     `gate.needs`, so they never block a merge.
 #
 # Branch protection should require ONLY the `gate` job — disabled stages skip, and `gate`
 # treats skipped jobs as pass, so turning a stage off never blocks a merge.
@@ -23,6 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       cfg: ${{ steps.resolve.outputs.cfg }}
+      has_anthropic: ${{ steps.detect.outputs.has_anthropic }}
     steps:
       - uses: actions/checkout@v4
       - id: resolve
@@ -36,6 +42,17 @@ jobs:
           # Validate it is parseable JSON, then emit compact form for downstream `if:` gates.
           echo "$CONFIG" | jq -e . > /dev/null
           echo "cfg=$(echo "$CONFIG" | jq -c .)" >> "$GITHUB_OUTPUT"
+      - id: detect
+        name: Detect whether ANTHROPIC_API_KEY is configured
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "has_anthropic=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_anthropic=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::ANTHROPIC_API_KEY not set — skipping Claude review stages."
+          fi
       - name: Record resolved config in run summary
         run: |
           {
@@ -45,31 +62,121 @@ jobs:
             echo '```';
           } >> "$GITHUB_STEP_SUMMARY"
 
+  # Detect whether migration/schema files changed, so migration-safety only runs when relevant.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      migrations: ${{ steps.filter.outputs.migrations }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            migrations:
+              - 'sql/**'
+              - 'prisma/schema.prisma'
+              - 'prisma/migrations/**'
+
+  # ---- Gated stages (listed in gate.needs) ----
+
   lint:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.lint.enabled }}
-    uses: suyash21101/.github/.github/workflows/lint.yml@v1
+    uses: suyash21101/.github/.github/workflows/lint.yml@v1.1.1
 
   typecheck:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.typecheck.enabled }}
-    uses: suyash21101/.github/.github/workflows/typecheck.yml@v1
+    uses: suyash21101/.github/.github/workflows/typecheck.yml@v1.1.1
 
   test:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.test.enabled }}
-    uses: suyash21101/.github/.github/workflows/test.yml@v1
+    uses: suyash21101/.github/.github/workflows/test.yml@v1.1.1
     with:
       coverage_min: ${{ fromJSON(needs.config.outputs.cfg).stages.test.coverage_min }}
 
   build:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.build.enabled }}
-    uses: suyash21101/.github/.github/workflows/build.yml@v1
+    uses: suyash21101/.github/.github/workflows/build.yml@v1.1.1
 
-  # The ONLY required status check. Passes unless a stage that actually ran reported failure.
+  prisma_validate:
+    needs: config
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.prisma_validate.enabled }}
+    uses: suyash21101/.github/.github/workflows/prisma-validate.yml@v1.1.1
+
+  # Claude stages request pull-requests:write to comment. The repo's default workflow token is
+  # read-only, and a called reusable workflow cannot escalate beyond the caller job's token —
+  # so each Claude job must grant the write scope here, or the run fails at startup.
+  security_scan:
+    needs: config
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.security_scan.enabled && needs.config.outputs.has_anthropic == 'true' }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+    uses: suyash21101/.github/.github/workflows/claude-security-scan.yml@v1.1.1
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  migration_safety:
+    needs: [config, changes]
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.migration_safety.enabled && needs.changes.outputs.migrations == 'true' && needs.config.outputs.has_anthropic == 'true' }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+    uses: suyash21101/.github/.github/workflows/claude-migration-safety.yml@v1.1.1
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  # ---- Advisory stages (NOT in gate.needs — they comment but never block) ----
+
+  bundle_size:
+    needs: config
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.bundle_size.enabled }}
+    uses: suyash21101/.github/.github/workflows/bundle-size.yml@v1.1.1
+    with:
+      threshold_kb: ${{ fromJSON(needs.config.outputs.cfg).stages.bundle_size.threshold_kb }}
+
+  pr_review:
+    needs: config
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.pr_review.enabled && needs.config.outputs.has_anthropic == 'true' }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+    uses: suyash21101/.github/.github/workflows/claude-pr-review.yml@v1.1.1
+    with:
+      model: ${{ fromJSON(needs.config.outputs.cfg).stages.pr_review.model }}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  regression:
+    needs: config
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.regression.enabled && needs.config.outputs.has_anthropic == 'true' }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+    uses: suyash21101/.github/.github/workflows/claude-regression-check.yml@v1.1.1
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  # The ONLY required status check. Passes unless a GATED stage that actually ran failed.
+  # Advisory stages are deliberately excluded from `needs` so they cannot block a merge.
   gate:
-    needs: [config, lint, typecheck, test, build]
+    needs:
+      - config
+      - lint
+      - typecheck
+      - test
+      - build
+      - prisma_validate
+      - security_scan
+      - migration_safety
     if: always()
     runs-on: ubuntu-latest
     steps:
