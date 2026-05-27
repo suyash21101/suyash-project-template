@@ -28,6 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       cfg: ${{ steps.resolve.outputs.cfg }}
+      has_anthropic: ${{ steps.detect.outputs.has_anthropic }}
     steps:
       - uses: actions/checkout@v4
       - id: resolve
@@ -41,6 +42,17 @@ jobs:
           # Validate it is parseable JSON, then emit compact form for downstream `if:` gates.
           echo "$CONFIG" | jq -e . > /dev/null
           echo "cfg=$(echo "$CONFIG" | jq -c .)" >> "$GITHUB_OUTPUT"
+      - id: detect
+        name: Detect whether ANTHROPIC_API_KEY is configured
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "has_anthropic=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_anthropic=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::ANTHROPIC_API_KEY not set — skipping Claude review stages."
+          fi
       - name: Record resolved config in run summary
         run: |
           {
@@ -103,6 +115,15 @@ jobs:
     uses: suyash21101/.github/.github/workflows/bundle-size.yml@v1.1.1
     with:
       threshold_kb: ${{ fromJSON(needs.config.outputs.cfg).stages.bundle_size.threshold_kb }}
+
+  pr_review:
+    needs: config
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.pr_review.enabled && needs.config.outputs.has_anthropic == 'true' }}
+    uses: suyash21101/.github/.github/workflows/claude-pr-review.yml@v1.1.1
+    with:
+      model: ${{ fromJSON(needs.config.outputs.cfg).stages.pr_review.model }}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   # The ONLY required status check. Passes unless a GATED stage that actually ran failed.
   # Advisory stages are deliberately excluded from `needs` so they cannot block a merge.
