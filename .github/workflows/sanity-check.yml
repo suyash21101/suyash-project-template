@@ -36,6 +36,6 @@ jobs:
 
   sanity:
     needs: resolve
-    uses: suyash21101/.github/.github/workflows/claude-sanity-check.yml@v1.1.0
+    uses: suyash21101/.github/.github/workflows/claude-sanity-check.yml@v1.1.1
     with:
       target_url: ${{ needs.resolve.outputs.target }}

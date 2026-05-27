@@ -13,4 +13,4 @@ jobs:
     permissions:
       pull-requests: write
       issues: write
-    uses: suyash21101/.github/.github/workflows/stale-pr-check.yml@v1.1.0
+    uses: suyash21101/.github/.github/workflows/stale-pr-check.yml@v1.1.1

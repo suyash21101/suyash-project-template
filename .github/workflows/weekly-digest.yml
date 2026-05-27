@@ -33,5 +33,5 @@ jobs:
       contents: read
       issues: read
       pull-requests: read
-    uses: suyash21101/.github/.github/workflows/weekly-digest.yml@v1.1.0
+    uses: suyash21101/.github/.github/workflows/weekly-digest.yml@v1.1.1
     secrets: inherit

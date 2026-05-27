@@ -4,7 +4,7 @@
 # (org default + optional repo override). Until that variable is set, this falls back to the
 # committed `pipeline.config.default.json`, so the pipeline works out of the box.
 #
-# Each stage delegates to a reusable module in suyash21101/.github, pinned to @v1.1.0.
+# Each stage delegates to a reusable module in suyash21101/.github, pinned to @v1.1.1.
 # Stage bodies live there; this file only orchestrates (resolve config, detect changes, gate).
 #
 # Gated vs advisory (PIPELINE_PLAYBOOK §17.3):
@@ -85,40 +85,40 @@ jobs:
   lint:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.lint.enabled }}
-    uses: suyash21101/.github/.github/workflows/lint.yml@v1.1.0
+    uses: suyash21101/.github/.github/workflows/lint.yml@v1.1.1
 
   typecheck:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.typecheck.enabled }}
-    uses: suyash21101/.github/.github/workflows/typecheck.yml@v1.1.0
+    uses: suyash21101/.github/.github/workflows/typecheck.yml@v1.1.1
 
   test:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.test.enabled }}
-    uses: suyash21101/.github/.github/workflows/test.yml@v1.1.0
+    uses: suyash21101/.github/.github/workflows/test.yml@v1.1.1
     with:
       coverage_min: ${{ fromJSON(needs.config.outputs.cfg).stages.test.coverage_min }}
 
   build:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.build.enabled }}
-    uses: suyash21101/.github/.github/workflows/build.yml@v1.1.0
+    uses: suyash21101/.github/.github/workflows/build.yml@v1.1.1
 
   prisma_validate:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.prisma_validate.enabled }}
-    uses: suyash21101/.github/.github/workflows/prisma-validate.yml@v1.1.0
+    uses: suyash21101/.github/.github/workflows/prisma-validate.yml@v1.1.1
 
   security_scan:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.security_scan.enabled && needs.config.outputs.has_anthropic == 'true' }}
-    uses: suyash21101/.github/.github/workflows/claude-security-scan.yml@v1.1.0
+    uses: suyash21101/.github/.github/workflows/claude-security-scan.yml@v1.1.1
     secrets: inherit
 
   migration_safety:
     needs: [config, changes]
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.migration_safety.enabled && needs.changes.outputs.migrations == 'true' && needs.config.outputs.has_anthropic == 'true' }}
-    uses: suyash21101/.github/.github/workflows/claude-migration-safety.yml@v1.1.0
+    uses: suyash21101/.github/.github/workflows/claude-migration-safety.yml@v1.1.1
     secrets: inherit
 
   # ---- Advisory stages (NOT in gate.needs — they comment but never block) ----
@@ -126,14 +126,14 @@ jobs:
   bundle_size:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.bundle_size.enabled }}
-    uses: suyash21101/.github/.github/workflows/bundle-size.yml@v1.1.0
+    uses: suyash21101/.github/.github/workflows/bundle-size.yml@v1.1.1
     with:
       threshold_kb: ${{ fromJSON(needs.config.outputs.cfg).stages.bundle_size.threshold_kb }}
 
   pr_review:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.pr_review.enabled && needs.config.outputs.has_anthropic == 'true' }}
-    uses: suyash21101/.github/.github/workflows/claude-pr-review.yml@v1.1.0
+    uses: suyash21101/.github/.github/workflows/claude-pr-review.yml@v1.1.1
     with:
       model: ${{ fromJSON(needs.config.outputs.cfg).stages.pr_review.model }}
     secrets: inherit
@@ -141,7 +141,7 @@ jobs:
   regression:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.regression.enabled && needs.config.outputs.has_anthropic == 'true' }}
-    uses: suyash21101/.github/.github/workflows/claude-regression-check.yml@v1.1.0
+    uses: suyash21101/.github/.github/workflows/claude-regression-check.yml@v1.1.1
     secrets: inherit
 
   # The ONLY required status check. Passes unless a GATED stage that actually ran failed.
