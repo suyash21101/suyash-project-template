@@ -32,6 +32,10 @@ yarn-error.log*
 amplify_outputs.json
 aws-exports.js
 
+# graphify — commit the graph outputs, ignore local-only artifacts
+graphify-out/.graphify_python
+graphify-out/cache/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
