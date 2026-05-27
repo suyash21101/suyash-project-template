@@ -14,7 +14,7 @@
 5. [Sprint Board Configuration](#5-sprint-board-configuration)
 6. [Story Writing Guide for Agent Compatibility](#6-story-writing-guide-for-agent-compatibility)
 7. [Branch Protection Rules](#7-branch-protection-rules)
-8. [Environment Setup (Supabase + Vercel)](#8-environment-setup-supabase--vercel)
+8. [Environment Setup (AWS-native)](#8-environment-setup-aws-native)
 9. [Knowledge Layer — Graphify](#9-knowledge-layer--graphify)
 10. [Stateful Agent Layer — Archon (Future)](#10-stateful-agent-layer--archon-future)
 11. [Slack Integration — Pipeline Notifications & Commands](#11-slack-integration--pipeline-notifications--commands)
@@ -22,6 +22,8 @@
 13. [New Project Bootstrap (From Template)](#13-new-project-bootstrap-from-template)
 14. [Cost Breakdown](#14-cost-breakdown)
 15. [Effectiveness Assessment](#15-effectiveness-assessment)
+16. [Recent Capabilities & How We Use Them (2026 H1)](#16-recent-capabilities--how-we-use-them-2026-h1)
+17. [Modular Pipeline Control](#17-modular-pipeline-control)
 
 ---
 
@@ -32,7 +34,7 @@
 | Repo                      | Purpose                                                                                                                                                       | Template?             |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | `suyash-project-template` | The reusable template. Contains all CI/CD workflows, issue templates, PR templates, setup scripts, base CLAUDE.md. You never deploy this — you clone from it. | Yes (GitHub Template) |
-| `CollegeOra-frontend`     | The Next.js application. All product code, tests, Prisma schema, Supabase config. This is your deployable project.                                            | Created from template |
+| `CollegeOra-frontend`     | The Next.js application. All product code, tests, Prisma schema, AWS app config. This is your deployable project.                                             | Created from template |
 | Future projects           | Any new project you start. Created from the template in one click. Inherits all pipeline config.                                                              | Created from template |
 
 ### Why Not More Repos?
@@ -115,20 +117,20 @@ Production
 
 ### Three Environments
 
-| Environment | Branch    | Vercel Deployment   | Database                            | Purpose                                                |
-| ----------- | --------- | ------------------- | ----------------------------------- | ------------------------------------------------------ |
-| **INT**     | `develop` | Auto preview deploy | Supabase Project: `collegeora-int`  | Integration. Features land here first. Unstable is OK. |
-| **UAT**     | `staging` | Auto preview deploy | Supabase Project: `collegeora-uat`  | User acceptance testing. Stable. Mirrors prod schema.  |
-| **PROD**    | `main`    | Production deploy   | Supabase Project: `collegeora-prod` | Live. Only tested, reviewed code reaches here.         |
+| Environment | Branch    | Compute (Amplify/Fargate)  | Database                           | Purpose                                                |
+| ----------- | --------- | -------------------------- | ---------------------------------- | ------------------------------------------------------ |
+| **INT**     | `develop` | INT app env                | Aurora cluster: `projectname-int`  | Integration. Features land here first. Unstable is OK. |
+| **UAT**     | `staging` | UAT app env                | Aurora cluster: `projectname-uat`  | User acceptance testing. Stable. Mirrors prod schema.  |
+| **PROD**    | `main`    | PROD app env (human-gated) | Aurora cluster: `projectname-prod` | Live. Only tested, reviewed code reaches here.         |
 
 ### Database Parity
 
-All three Supabase projects must have identical schemas. Enforce this by:
+All three Aurora clusters must have identical schemas. Enforce this by:
 
 1. All schema changes go through `sql/` migration files (numbered: `001-`, `002-`, etc.)
 2. CI validates that the Prisma schema matches the SQL migrations
 3. The same migration scripts run against all three databases (INT first, then UAT, then PROD)
-4. Never make manual schema changes in the Supabase dashboard — always through migration files
+4. Never make manual schema changes in the AWS console — always through migration files
 
 ---
 
@@ -222,6 +224,8 @@ Agents split into two tiers based on where they run:
 
 **Local Agents (Max plan, effectively unlimited):** Heavy agents that do real development work — planning, implementing, testing, documenting. These are the most expensive if run on API ($0.50–5.00/run), but **free on a Claude Max/Pro subscription** via Claude Code CLI. Agents 6–8.
 
+> **2026 billing change — read this.** Anthropic split `claude -p`, the Claude Code GitHub Actions, the Agent SDK, and third-party frameworks out of Pro/Max subscription quotas into a **separate API credit pool at standard API rates**. Practical consequences for this pipeline: (1) the CI agents _must_ be funded by `ANTHROPIC_API_KEY` — they were never on your subscription anyway, so nothing changes there; (2) only **interactive** local Claude Code sessions still draw on your Max plan. Don't try to route CI agents through a subscription — it isn't allowed, and the cost table in §14 already assumes API rates for CI.
+
 **Why this split matters:**
 
 | Scenario                | API-only cost/month | Hybrid cost/month |
@@ -293,13 +297,13 @@ jobs:
 **Trigger:** `pull_request` opened/synchronized
 **Action:** Scans for:
 
-- SQL injection (especially raw Supabase queries)
+- SQL injection (especially Prisma raw queries / hand-written SQL)
 - XSS in React components (dangerouslySetInnerHTML, unescaped user input)
 - Auth bypass (missing middleware checks, exposed API routes)
 - CSRF vulnerabilities
 - Secrets in code (API keys, tokens, passwords)
 - Insecure dependencies
-- RLS policy gaps (Supabase Row Level Security)
+- RLS policy gaps (Postgres Row Level Security)
 - SSRF in server components
 - Open redirect vulnerabilities
 
@@ -308,10 +312,10 @@ jobs:
 **Prompt focus:**
 
 ```
-You are a security engineer reviewing a PR for a Next.js + Supabase app.
-The app uses Supabase Auth with RLS policies. Check:
+You are a security engineer reviewing a PR for a Next.js app on AWS.
+The app uses Amazon Cognito for auth and Aurora PostgreSQL with RLS policies. Check:
 1. Are there any API routes missing auth checks?
-2. Are Supabase queries using the correct client (server vs anon)?
+2. Is the DB session scoped to the request user (app.user_id) so RLS applies?
 3. Is user input sanitized before database operations?
 4. Are there any secrets or tokens in the code?
 5. Do new database operations have corresponding RLS policies?
@@ -751,13 +755,13 @@ Example: Add Google OAuth button to login page
 [Which part of the app does this touch? Name specific files or directories.]
 
 The onboarding flow lives in `src/app/onboarding/`. The login page is
-`src/app/page.tsx`. Supabase Auth is configured in `src/lib/supabase/`.
+`src/app/page.tsx`. Cognito auth is configured in `src/lib/auth/`.
 The design mockup is at `Screens for onboarding/login.png`.
 
 ## Acceptance Criteria
 
 - [ ] Google OAuth button renders on the login page
-- [ ] Clicking initiates Supabase `signInWithOAuth({ provider: 'google' })`
+- [ ] Clicking initiates the Cognito hosted-UI / IdP sign-in for Google
 - [ ] Successful auth redirects to `/onboarding/welcome`
 - [ ] Failed auth shows error state (not a crash)
 - [ ] Button follows the design in the referenced screenshot
@@ -765,7 +769,7 @@ The design mockup is at `Screens for onboarding/login.png`.
 
 ## Technical Notes
 
-- Use `@supabase/ssr` `createClient` for server-side auth
+- Use the Cognito server client for server-side auth (validate the JWT, set the DB session user)
 - Follow component patterns in `src/components/` (see `primary-button.tsx`)
 - Use Material Design 3 color tokens from `globals.css`
 - The auth callback route already exists at `src/app/auth/callback/route.ts`
@@ -801,7 +805,7 @@ Example: Login redirect loops when session cookie is expired
 ## Steps to Reproduce
 
 1. Log in successfully
-2. Wait for session to expire (or clear the `sb-` cookies manually)
+2. Wait for session to expire (or clear the session cookies manually)
 3. Navigate to `/dashboard`
 4. Observe: page redirects to `/` which redirects back to `/dashboard` infinitely
 
@@ -816,7 +820,7 @@ Infinite redirect loop between `/` and `/dashboard`.
 ## Context
 
 - Middleware: `src/middleware.ts`
-- Auth check: `src/lib/supabase/middleware.ts`
+- Auth check: `src/lib/auth/middleware.ts`
 - Session utility: `src/lib/session.ts`
 
 ## Acceptance Criteria
@@ -941,62 +945,45 @@ done
 
 ---
 
-## 8. Environment Setup (Supabase + Vercel)
+## 8. Environment Setup (AWS-native)
 
-### Supabase — Three Projects
+This stack is **strictly AWS** — Aurora PostgreSQL + Cognito + S3, hosted on Amplify Hosting or ECS
+Fargate. The full reference (accounts, VPC, OIDC, per-service setup, RLS migration) lives in
+**`docs/AWS_INFRA_SETUP.md`**; this section is just the per-environment summary.
 
-| Project | Name               | Plan | Cost   |
-| ------- | ------------------ | ---- | ------ |
-| INT     | `projectname-int`  | Free | $0     |
-| UAT     | `projectname-uat`  | Free | $0     |
-| PROD    | `projectname-prod` | Pro  | $25/mo |
+### Three environments
 
-**Setup steps:**
+| Env  | Branch    | Aurora cluster     | Compute (Amplify or Fargate)      |
+| ---- | --------- | ------------------ | --------------------------------- |
+| INT  | `develop` | `projectname-int`  | INT app env                       |
+| UAT  | `staging` | `projectname-uat`  | UAT app env                       |
+| PROD | `main`    | `projectname-prod` | PROD app env (human-gated deploy) |
 
-1. Go to `app.supabase.com` → New Project for each environment
-2. Name them consistently: `collegeora-int`, `collegeora-uat`, `collegeora-prod`
-3. Use the same region for all three (minimize latency differences)
-4. Run `sql/001-full-schema.sql` in each project's SQL editor
-5. Configure auth providers (Google, Apple) in each project
-   - INT/UAT: Use test OAuth credentials
-   - PROD: Use production OAuth credentials
-6. Note down the project URL and anon key for each
+**Setup (per env, via `docs/AWS_INFRA_SETUP.md`):**
 
-### Vercel — Environment Variables Per Branch
+1. Stand up Aurora PostgreSQL (Serverless v2); run numbered `sql/0NN-*.sql` migrations via the migration job (§14).
+2. Create a Cognito User Pool; wire Google/Apple as IdPs (test creds for INT/UAT, prod creds for PROD).
+3. Create the S3 bucket(s); set bucket policy + CORS.
+4. Configure app config per env (set in the Amplify console or the Fargate task definition, **not** committed):
+   `DATABASE_URL`, `COGNITO_*`, `S3_BUCKET`, `AWS_REGION`, `NEXT_PUBLIC_*`.
+5. Deploys are keyless via **GitHub OIDC → IAM role** (`AWS_INFRA_SETUP.md` §9); PROD/UAT go through
+   a GitHub Environment with a required human reviewer.
 
-In Vercel project settings → Environment Variables:
-
-| Variable                        | Production (`main`)              | Preview (`staging`)             | Preview (`develop`)             |
-| ------------------------------- | -------------------------------- | ------------------------------- | ------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | `https://xxx.supabase.co` (PROD) | `https://yyy.supabase.co` (UAT) | `https://zzz.supabase.co` (INT) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | PROD anon key                    | UAT anon key                    | INT anon key                    |
-| `DATABASE_URL`                  | PROD connection string           | UAT connection string           | INT connection string           |
-| `SUPABASE_SERVICE_ROLE_KEY`     | PROD service key                 | UAT service key                 | INT service key                 |
-
-**Vercel branch mapping:**
-
-- Production domain → `main` branch
-- `staging.projectname.vercel.app` → `staging` branch (configure in Vercel)
-- Preview deploys → all other branches (auto)
-
-To make Vercel use different env vars for `staging` vs other preview branches, use Vercel's "Git Branch" env var scoping:
-
-1. Add the variable
-2. Uncheck "Production"
-3. Check "Preview"
-4. Set "Git Branch" to `staging`
-5. Repeat for `develop`
-
-### `.env.example` (Included in Template)
+### `.env.example` (included in template)
 
 ```bash
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+# Database — Aurora PostgreSQL (via Prisma)
+DATABASE_URL=postgresql://app:password@your-cluster.cluster-xxxx.region.rds.amazonaws.com:5432/appdb
 
-# Database (Prisma)
-DATABASE_URL=postgresql://postgres:password@db.your-project.supabase.co:5432/postgres
+# Auth — Amazon Cognito
+COGNITO_USER_POOL_ID=region_xxxxxxxxx
+COGNITO_CLIENT_ID=your-app-client-id
+COGNITO_CLIENT_SECRET=your-app-client-secret
+COGNITO_ISSUER=https://cognito-idp.region.amazonaws.com/region_xxxxxxxxx
+
+# Storage — S3
+S3_BUCKET=your-app-assets-bucket
+AWS_REGION=us-east-1
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -1047,10 +1034,10 @@ Only processes changed files. Fast and cheap.
 
 ```bash
 # Ask a question about architecture
-claude "/graphify query 'What components depend on Supabase auth?'"
+claude "/graphify query 'What components depend on Cognito auth?'"
 
 # Find the shortest path between two concepts
-claude "/graphify path 'LoginPage' 'SupabaseClient'"
+claude "/graphify path 'LoginPage' 'CognitoClient'"
 
 # BFS/DFS exploration
 claude "/graphify query 'What does the onboarding flow touch?' --mode bfs"
@@ -1158,19 +1145,19 @@ Add to the template so every new project gets Graphify wired in:
 
 [Archon](https://github.com/coleam00/archon) by Cole Medin is an open-source AI agent framework that provides:
 
-- **Persistent memory** via Supabase vector storage
+- **Persistent memory** via Postgres + pgvector storage (point it at our Aurora cluster — no Supabase)
 - **Multi-agent orchestration** with handoffs between agents
 - **MCP integration** for tool access
 - **Self-hosted agent runtime** — agents run on your infrastructure, not limited to GitHub Actions' 6-hour ceiling
 
 ### Why Not Now
 
-| Concern                          | Detail                                                                      |
-| -------------------------------- | --------------------------------------------------------------------------- |
-| **Complexity**                   | Adds hosting (Docker/VPS), Supabase vector config, agent runtime management |
-| **Cost**                         | VPS hosting ($5-20/mo) + same LLM costs + engineering time to set up        |
-| **Diminishing returns early on** | Your current pipeline is stateless and that's fine for <50 stories          |
-| **Dependency risk**              | Archon is evolving rapidly; locking in now means churn later                |
+| Concern                          | Detail                                                                             |
+| -------------------------------- | ---------------------------------------------------------------------------------- |
+| **Complexity**                   | Adds hosting (Docker/Fargate), pgvector config on Aurora, agent runtime management |
+| **Cost**                         | VPS hosting ($5-20/mo) + same LLM costs + engineering time to set up               |
+| **Diminishing returns early on** | Your current pipeline is stateless and that's fine for <50 stories                 |
+| **Dependency risk**              | Archon is evolving rapidly; locking in now means churn later                       |
 
 ### When to Adopt Archon
 
@@ -1217,7 +1204,7 @@ Trigger any **two** of these conditions:
 ```
 
 - **Graphify** = structural memory (what calls what, file dependencies, component relationships). Extracted from code. Updated after merges.
-- **Archon's Supabase vectors** = semantic memory (past decisions, resolved bugs, design rationale, sprint context). Accumulated over time from agent runs.
+- **Archon's pgvector store (on Aurora)** = semantic memory (past decisions, resolved bugs, design rationale, sprint context). Accumulated over time from agent runs.
 
 #### Phased Rollout
 
@@ -1240,7 +1227,7 @@ Trigger any **two** of these conditions:
      │   ├── developer.py
      │   ├── reviewer.py
      │   └── orchestrator.py
-     └── .env  # Supabase + Anthropic credentials
+     └── .env  # Aurora (pgvector) + Anthropic credentials
    ```
 
 2. **Migrate agents one at a time:**
@@ -1250,7 +1237,7 @@ Trigger any **two** of these conditions:
 
 3. **Wire up the memory layer:**
    - Archon agents read `graphify-out/graph.json` for structural context (replaces file exploration)
-   - Archon stores semantic memories in Supabase vectors (decisions, past bugs, rationale)
+   - Archon stores semantic memories in Aurora pgvector (decisions, past bugs, rationale)
    - Each agent run starts by querying both layers before doing any work
 
 4. **Enable autonomous story pickup:**
@@ -1260,13 +1247,13 @@ Trigger any **two** of these conditions:
 
 ### Cost Impact
 
-| Item                    | Current (Stateless)       | With Archon                                                          |
-| ----------------------- | ------------------------- | -------------------------------------------------------------------- |
-| Agent LLM costs         | Same                      | Same                                                                 |
-| VPS for Archon runtime  | $0                        | $5-20/mo                                                             |
-| Supabase vector storage | $0 (included in Pro plan) | $0                                                                   |
-| Setup time              | 0                         | ~1-2 days                                                            |
-| **Net benefit**         | —                         | Agents make fewer mistakes, work autonomously, remember past context |
+| Item                      | Current (Stateless) | With Archon                                                          |
+| ------------------------- | ------------------- | -------------------------------------------------------------------- |
+| Agent LLM costs           | Same                | Same                                                                 |
+| VPS for Archon runtime    | $0                  | $5-20/mo                                                             |
+| pgvector storage (Aurora) | $0 (same cluster)   | negligible (shares the app's Aurora)                                 |
+| Setup time                | 0                   | ~1-2 days                                                            |
+| **Net benefit**           | —                   | Agents make fewer mistakes, work autonomously, remember past context |
 
 ### What NOT to Do
 
@@ -1334,7 +1321,7 @@ For triggering workflows from Slack:
 
 1. In the Slack app settings → Slash Commands → Create New Command
 2. Add `/deploy`, `/sanity`, `/status` (details in Slash Commands section below)
-3. Request URL: a small handler (Vercel function or Slack Workflow Builder)
+3. Request URL: a small handler (AWS Lambda + API Gateway, or Slack Workflow Builder)
 
 ### Notification Formats
 
@@ -1357,7 +1344,7 @@ For triggering workflows from Slack:
 
 ```
 🔴 CRITICAL Security Finding on PR #18
-   "API route /api/users exposes SUPABASE_SERVICE_ROLE_KEY"
+   "API route /api/users exposes COGNITO_CLIENT_SECRET"
    → Review: github.com/suyashbhatia/CollegeOra-frontend/pull/18
 ```
 
@@ -1367,7 +1354,7 @@ Only CRITICAL findings get posted. HIGH/MEDIUM/LOW stay as PR comments.
 
 ```
 🤖 Developer Agent stuck on #42 (Add Google OAuth)
-   "Unclear: should OAuth callback use server or client Supabase client?"
+   "Unclear: should the OAuth callback validate the Cognito JWT server-side or client-side?"
    → Reply in issue: github.com/suyashbhatia/CollegeOra-frontend/issues/42
 ```
 
@@ -1504,9 +1491,9 @@ These let you trigger workflows from Slack. Two approaches:
    Body: `{"ref": "main"}`
 4. Step: Send message to channel: "🔄 Sanity check triggered..."
 
-#### Option B: Vercel Edge Function (More Flexible)
+#### Option B: AWS Lambda (or a Next.js API route) — More Flexible
 
-Create a tiny API route in your Next.js app that handles Slack's POST and dispatches GitHub workflows:
+Create a tiny handler — an AWS Lambda behind API Gateway, or an API route in your Next.js app — that handles Slack's POST and dispatches GitHub workflows:
 
 ```
 POST /api/slack/commands
@@ -1617,9 +1604,9 @@ echo ""
 echo "=== Setup Complete ==="
 echo ""
 echo "Remaining manual steps:"
-echo "  1. Create 3 Supabase projects (int, uat, prod)"
-echo "  2. Run your SQL migrations on each"
-echo "  3. Configure Vercel environment variables per branch"
+echo "  1. Stand up AWS infra per env (Aurora + Cognito + S3 + Amplify/Fargate) — see docs/AWS_INFRA_SETUP.md"
+echo "  2. Run your SQL migrations on each Aurora cluster (INT -> UAT -> PROD)"
+echo "  3. Set per-env app config (DATABASE_URL, COGNITO_*, S3_BUCKET, NEXT_PUBLIC_*) in Amplify/Fargate"
 echo "  4. Add ANTHROPIC_API_KEY to GitHub repo secrets"
 echo "  5. Update CLAUDE.md with project-specific details"
 echo "  6. Run: claude '/graphify . --mode deep' to generate initial knowledge graph"
@@ -1651,8 +1638,8 @@ gh secret set ANTHROPIC_API_KEY
 # 5. Update CLAUDE.md with project-specific info
 #    (tech stack, conventions, design system, etc.)
 
-# 6. Create Supabase projects and configure Vercel env vars
-#    (follow Section 8 of this playbook)
+# 6. Stand up AWS infra (Aurora + Cognito + S3 + Amplify/Fargate) and set per-env config
+#    (follow Section 8 of this playbook + docs/AWS_INFRA_SETUP.md)
 
 # 7. Start writing stories and building
 ```
@@ -1665,23 +1652,23 @@ gh secret set ANTHROPIC_API_KEY
 
 ### Monthly Costs (Active Development)
 
-| Item                                  | Cost                     | Notes                                                           |
-| ------------------------------------- | ------------------------ | --------------------------------------------------------------- |
-| **Supabase**                          | $25                      | 2 free projects (INT, UAT) + 1 Pro (PROD)                       |
-| **Vercel Pro**                        | $20                      | Needed for team features + preview deploy controls              |
-| **GitHub**                            | $0–4                     | Free for public, $4/user/mo for private Teams                   |
-| **Claude Max Plan**                   | $100–200                 | Your interactive development sessions                           |
-| **Claude API (PR Review)**            | $15–25                   | ~50 PRs/mo × $0.30–0.50 avg                                     |
-| **Claude API (Security Scan)**        | $10–20                   | ~50 PRs/mo × $0.20–0.40 avg                                     |
-| **Claude API (Regression)**           | $10–20                   | ~30 PRs/mo × $0.30–0.60 avg                                     |
-| **Claude API (Sanity + Cron agents)** | $5–15                    | Low frequency, small prompts                                    |
-| **Claude API (Developer Agent)**      | $20–50                   | Depends on how many stories you delegate                        |
-| **Graphify graph updates**            | $2–5                     | ~$0.05–0.10 per incremental update, runs on merge to develop    |
-| **Archon VPS (future)**               | $0 (now) / $5–20 (later) | Only when you adopt Archon for stateful agents                  |
-| **Slack integration**                 | $0                       | Free tier covers webhooks, slash commands, and Workflow Builder |
-| **Domain + DNS**                      | $12–15                   | Annual, amortized                                               |
-| **Total (now)**                       | **$222–375/mo**          |                                                                 |
-| **Total (with Archon, future)**       | **$227–395/mo**          |                                                                 |
+| Item                                          | Cost                     | Notes                                                                                                                              |
+| --------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **AWS (Aurora Serverless v2 + Cognito + S3)** | $40–90                   | Aurora scales near-zero when idle; Cognito free < 50k MAU; S3 pennies. INT/UAT small, PROD bears most. See docs/AWS_INFRA_SETUP.md |
+| **AWS (Amplify Hosting or Fargate)**          | $10–40                   | Amplify build+host, or a small Fargate task per env                                                                                |
+| **GitHub**                                    | $0–4                     | Free for public, $4/user/mo for private Teams                                                                                      |
+| **Claude Max Plan**                           | $100–200                 | Your interactive development sessions                                                                                              |
+| **Claude API (PR Review)**                    | $15–25                   | ~50 PRs/mo × $0.30–0.50 avg                                                                                                        |
+| **Claude API (Security Scan)**                | $10–20                   | ~50 PRs/mo × $0.20–0.40 avg                                                                                                        |
+| **Claude API (Regression)**                   | $10–20                   | ~30 PRs/mo × $0.30–0.60 avg                                                                                                        |
+| **Claude API (Sanity + Cron agents)**         | $5–15                    | Low frequency, small prompts                                                                                                       |
+| **Claude API (Developer Agent)**              | $20–50                   | Depends on how many stories you delegate                                                                                           |
+| **Graphify graph updates**                    | $2–5                     | ~$0.05–0.10 per incremental update, runs on merge to develop                                                                       |
+| **Archon VPS (future)**                       | $0 (now) / $5–20 (later) | Only when you adopt Archon for stateful agents                                                                                     |
+| **Slack integration**                         | $0                       | Free tier covers webhooks, slash commands, and Workflow Builder                                                                    |
+| **Domain + DNS**                              | $12–15                   | Annual, amortized                                                                                                                  |
+| **Total (now)**                               | **$227–460/mo**          | AWS is usage-based, so the low end holds when INT/UAT idle                                                                         |
+| **Total (with Archon, future)**               | **$232–480/mo**          |                                                                                                                                    |
 
 ### Comparison
 
@@ -1728,6 +1715,187 @@ The pipeline this playbook describes doesn't replace engineering judgment — it
 
 ---
 
+## 16. Recent Capabilities & How We Use Them (2026 H1)
+
+> Features that shipped after the original playbook was written (Feb–May 2026), and the
+> specific role each one plays in this pipeline. Decisions and rationale are tracked in
+> `docs/SAMPLE_SETUP_LOG.md`.
+
+### 16.1 Local development as an agent team
+
+The local Developer Agent (Agent 6) is no longer a single conversation. Using Claude Code's
+**multi-agent orchestration** (public beta), `claude "Implement #42"` runs as an _orchestrator_
+that dispatches bounded subagents, each with its own context window:
+
+| Subagent      | Responsibility                                          |
+| ------------- | ------------------------------------------------------- |
+| Implementer   | Writes the feature code following CLAUDE.md + the graph |
+| Test-writer   | Authors unit/integration tests for the change           |
+| Self-reviewer | Reviews the diff against conventions before you see it  |
+
+The orchestrator owns planning and integration; you stay in the loop for architecture calls.
+
+**Outcomes:** Pass the story's Acceptance Criteria into the run as **Outcomes** so the team
+iterates until it self-verifies "done" instead of stopping at first pass.
+
+**Isolation & safety:** Run the team in a **worktree + native sandbox** (`/sandbox`,
+OS-level filesystem/network isolation). The dev server runs as a **background task** so it
+doesn't block the agents. **Checkpoints/Rewind** (`/rewind`, Esc-Esc) is your undo net —
+snapshots are taken before each edit, so a bad change is one keypress to revert.
+
+### 16.2 Local guardrail hooks
+
+The template ships a small, high-value set of Claude Code **hooks** in `settings.json`. These
+are deterministic (no token cost) and mirror the CI gates locally so problems surface before a push:
+
+1. **Branch-name check** — block work unless the branch name contains the issue ID (`feature/42-...`).
+2. **Protected-path guard** — block edits to generated files (`graphify-out/`, lockfiles).
+3. **Stop hook** — run lint + typecheck when a session stops; failures surface immediately.
+
+(Deliberately omitted for now: tests-before-stop and post-dependency security scans — added later if friction is acceptable.)
+
+### 16.3 Deep pre-prod review — `/ultrareview`
+
+`/ultrareview` runs a **multi-agent cloud review** of a branch or PR. It is heavier (and billed)
+compared to the lightweight per-PR `claude-pr-review.yml`, so it sits at a single, high-value gate:
+
+- **Per-PR (`→ develop`):** the fast `claude-pr-review.yml` runs, as before.
+- **Before promoting `staging → main`:** run **`/ultrareview <PR#>`** as the final pre-prod gate.
+
+It is user-triggered and billed — it cannot be launched from CI or by an agent. Treat it as a
+required line item on the release/promotion checklist.
+
+### 16.4 End-of-cycle QA — Codex computer use
+
+After deploying to **UAT (`staging`)** and before opening `staging → main`, run a
+**Codex computer-use browser agent** against the live UAT deploy. It clicks through critical
+flows (login, onboarding, and whatever the story touched), fills forms, inspects DOM, screenshots,
+and writes an issue summary. This is human-style verification that complements the scripted
+Playwright E2E suite — it catches things assertions don't.
+
+- **Now:** a manual step on the promotion checklist (mention `@Computer` / enable the Browser plugin in the Codex app).
+- **Later:** automate via `codex-action` in a workflow once it has proven its value. Codex reads
+  review/QA guidance from the nearest `AGENTS.md`, which this repo already has.
+
+### 16.5 Codex as a second PR reviewer (future toggle)
+
+Codex now does GitHub PR reviews (`@codex review`, flags only P0/P1, reads `AGENTS.md` guidelines).
+We run **Claude-only review for now**. If Claude starts missing correctness bugs, enable Codex as a
+second, correctness-focused reviewer alongside the Claude PR Reviewer — two models catch different
+classes of bug. This adds a second vendor key/bill and more comment volume, so it stays off until needed.
+
+### 16.6 Memory: Dreaming as a lightweight stand-in
+
+Claude's **Dreaming** (research preview) reorganizes a memory store — merging duplicates and
+replacing stale entries. It can cover part of what the planned Archon semantic-memory layer (§10)
+would do, without standing up a VPS. This does not replace Archon's autonomy/handoff features, but it
+pushes the "adopt Archon" trigger further out. Revisit when stateless agents demonstrably hit memory limits.
+
+### 16.7 Updated story lifecycle
+
+```
+issue (feature template) → groom → label claude-ready
+claude "Implement #42"  →  agent team (implementer + tester + self-reviewer), Outcomes-driven
+   →  PR to develop  →  CI + Claude review + security + regression  →  merge  →  graph updates
+develop → staging (UAT)
+   →  Codex computer-use QA on UAT deploy  →  /ultrareview <PR#>
+   →  staging → main (PROD)  →  sanity check  →  Done
+```
+
+---
+
+## 17. Modular Pipeline Control
+
+> Goal: each pipeline stage (lint, test, security, e2e, etc.) is an **independently toggleable,
+> composable, versioned module** — so a project can turn stages on/off without forking YAML, and
+> shared logic is fixed once and inherited everywhere.
+
+Today the CI is a set of standalone workflow files (`ci.yml`, `claude-pr-review.yml`, …). They are
+_loosely_ separable but there is no control plane to toggle or recombine them. This section defines
+that control plane, in four layers of increasing power.
+
+### 17.1 The four control mechanisms
+
+| #   | Mechanism                                                   | What it controls                                                                               | Cost to flip                                        |
+| --- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 1   | **Path filters** (`on.<event>.paths`)                       | A stage only fires when relevant files change (e.g. migration-safety on `prisma/**`, `sql/**`) | Edit YAML once                                      |
+| 2   | **Repo/Org variable flags** (`if: vars.ENABLE_X == 'true'`) | Whether a stage runs at all, per repo or org-wide                                              | Toggle in repo Settings → Variables, no code change |
+| 3   | **Per-PR skip labels** (`!contains(labels, 'skip-e2e')`)    | One-off bypass on a single PR                                                                  | Add/remove a label                                  |
+| 4   | **Reusable workflows** (`workflow_call`)                    | The stage's _implementation_, shared across all projects, versioned by tag                     | Bump the `@vN` reference                            |
+
+Layers compose: a reusable module (4) is invoked by a project, gated by a variable flag (2) and a
+path filter (1), with a label (3) as the manual escape hatch.
+
+### 17.2 Reusable modules + orchestrator
+
+Each stage becomes a reusable workflow living in the user-level **`suyash21101/.github`** repo
+(per §1 repo strategy), exposing typed `inputs`:
+
+```yaml
+# suyash21101/.github/.github/workflows/test.yml  (the module)
+on:
+  workflow_call:
+    inputs:
+      enabled: { type: boolean, default: true }
+      coverage_min: { type: number, default: 80 }
+jobs:
+  test:
+    if: ${{ inputs.enabled }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci && npm test -- --coverage.thresholds.lines=${{ inputs.coverage_min }}
+```
+
+A single orchestrator in each project repo composes the modules and applies the flags:
+
+```yaml
+# <project>/.github/workflows/pipeline.yml  (the composer)
+on: { pull_request: { types: [opened, synchronize] } }
+jobs:
+  lint: { uses: suyash21101/.github/.github/workflows/lint.yml@v1 }
+  test:
+    uses: suyash21101/.github/.github/workflows/test.yml@v1
+    with:
+      enabled: ${{ vars.ENABLE_TESTS != 'false' }}
+      coverage_min: 80
+  security:
+    if: ${{ vars.ENABLE_SECURITY_SCAN == 'true' }}
+    uses: suyash21101/.github/.github/workflows/claude-security-scan.yml@v1
+    secrets: inherit
+  e2e:
+    if: ${{ github.base_ref == 'staging' && !contains(github.event.pull_request.labels.*.name, 'skip-e2e') }}
+    uses: suyash21101/.github/.github/workflows/e2e.yml@v1
+```
+
+This is the whole point: **add a stage = add a `uses:` line; disable a stage = flip a variable;
+fix a stage everywhere = edit one module and bump the tag.**
+
+### 17.3 Required vs advisory
+
+Modularity and branch protection (§7) interact: a stage can _run_ but not _block_. Map them
+deliberately —
+
+- **Blocking on `main`:** lint, typecheck, test, build, security scan (the required status checks).
+- **Advisory (comments, never blocks):** regression analysis, Lighthouse/perf, accessibility.
+
+Make a stage advisory by simply not listing its check name in the branch's `required_status_checks`.
+
+### 17.4 Migration path (current → modular)
+
+1. Stand up `suyash21101/.github` with one reusable workflow per existing stage (lift the current
+   `ci.yml`, `claude-*.yml` bodies into `workflow_call` modules).
+2. Replace each project's standalone workflows with a single `pipeline.yml` orchestrator that
+   `uses:` the modules.
+3. Introduce `ENABLE_*` repo variables and wire the `if:` gates.
+4. Update branch-protection required-check names to match the orchestrator's job names.
+
+> **Status:** this section is the _design_. The reusable module files do not exist yet — authoring
+> them is part of standing up the `.github` repo (tracked in `SAMPLE_SETUP_LOG.md`), done alongside
+> the first real project bootstrap, not before.
+
+---
+
 ## Appendix: Quick Reference Card
 
 ```
@@ -1736,10 +1904,12 @@ Start a new project:     gh repo create X --template suyash-project-template --c
 
 Write a story:           gh issue create (use the feature template)
 Mark agent-ready:        gh issue edit 42 --add-label "claude-ready"
-Start agent on story:    claude "Implement issue #42"
+Start agent on story:    claude "Implement issue #42"   (runs as an agent team, §16.1)
 Check pipeline status:   gh pr checks <PR-number>
 View sprint board:       gh project view --owner <you>
 Deploy to staging:       Open PR: develop → staging
+UAT browser QA:          Codex computer-use agent on the UAT deploy (§16.4)
+Deep pre-prod review:    /ultrareview <PR-number>   (before staging → main, §16.3)
 Deploy to prod:          Open PR: staging → main
 Post-deploy check:       Automatic (sanity check workflow)
 

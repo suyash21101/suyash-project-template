@@ -4,7 +4,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Connection URL lives in prisma.config.ts (Prisma 7 moved it out of the schema).
+  // Points at Aurora PostgreSQL via DATABASE_URL per env — see docs/AWS_INFRA_SETUP.md §14.
 }
 
 // Add your models here

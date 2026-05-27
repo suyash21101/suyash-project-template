@@ -1,0 +1,20 @@
+{
+  "stages": {
+    "lint": { "enabled": true },
+    "typecheck": { "enabled": true },
+    "test": { "enabled": true, "coverage_min": 80 },
+    "build": { "enabled": true },
+    "prisma_validate": { "enabled": true },
+    "bundle_size": { "enabled": true, "threshold_kb": 50 },
+    "security_scan": { "enabled": true, "block_on": "critical" },
+    "regression": { "enabled": false },
+    "migration_safety": { "enabled": true },
+    "e2e": { "enabled": true, "run_on": ["staging", "main"] },
+    "a11y": { "enabled": false },
+    "lighthouse": { "enabled": false, "min_score": 90 },
+    "pr_review": { "enabled": true, "model": "sonnet" },
+    "sanity_check": { "enabled": true },
+    "knowledge_graph": { "enabled": true }
+  },
+  "deploy": { "mode": "amplify", "migrate_before_traffic": true }
+}

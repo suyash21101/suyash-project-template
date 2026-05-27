@@ -1,15 +1,13 @@
 # Default owner for everything
-* @suyashbhatia
+* @suyash21101
 
-# Auth and security-sensitive code — always require review
-src/middleware.ts @suyashbhatia
-src/lib/supabase/ @suyashbhatia
-src/app/auth/ @suyashbhatia
-src/lib/session.ts @suyashbhatia
+# Auth and security-sensitive code — always require review.
+# Add concrete paths once the AWS-native auth lands (Cognito client, middleware,
+# session helpers) — see docs/AWS_INFRA_SETUP.md §5.
 
 # Database schema changes — always require review
-prisma/ @suyashbhatia
-sql/ @suyashbhatia
+prisma/ @suyash21101
+sql/ @suyash21101
 
 # CI/CD pipeline changes — always require review
-.github/ @suyashbhatia
+.github/ @suyash21101

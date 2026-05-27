@@ -18,7 +18,7 @@ body:
       description: What factors should the recommendation consider?
       placeholder: |
         - Must support subscriptions
-        - Must work with Supabase Auth
+        - Must work with Cognito auth
         - Budget < $50/mo at our scale
 
   - type: textarea

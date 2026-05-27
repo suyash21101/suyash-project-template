@@ -10,13 +10,20 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],
-      include: ["src/**/*.{ts,tsx}"],
+      // Enforce coverage on the logic layer (`src/lib`). UI scaffolding under `src/app`
+      // is exercised by component/E2E tests, not unit-coverage thresholds.
+      include: ["src/lib/**/*.{ts,tsx}"],
       exclude: [
         "src/**/*.test.{ts,tsx}",
         "src/**/*.spec.{ts,tsx}",
         "src/**/*.d.ts",
-        "src/app/layout.tsx",
       ],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 70,
+        statements: 80,
+      },
     },
   },
   resolve: {
