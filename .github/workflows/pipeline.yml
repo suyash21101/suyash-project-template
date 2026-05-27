@@ -107,6 +107,31 @@ jobs:
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.prisma_validate.enabled }}
     uses: suyash21101/.github/.github/workflows/prisma-validate.yml@v1.1.1
 
+  # Claude stages request pull-requests:write to comment. The repo's default workflow token is
+  # read-only, and a called reusable workflow cannot escalate beyond the caller job's token —
+  # so each Claude job must grant the write scope here, or the run fails at startup.
+  security_scan:
+    needs: config
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.security_scan.enabled && needs.config.outputs.has_anthropic == 'true' }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+    uses: suyash21101/.github/.github/workflows/claude-security-scan.yml@v1.1.1
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  migration_safety:
+    needs: [config, changes]
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.migration_safety.enabled && needs.changes.outputs.migrations == 'true' && needs.config.outputs.has_anthropic == 'true' }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+    uses: suyash21101/.github/.github/workflows/claude-migration-safety.yml@v1.1.1
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
   # ---- Advisory stages (NOT in gate.needs — they comment but never block) ----
 
   bundle_size:
@@ -119,9 +144,24 @@ jobs:
   pr_review:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.pr_review.enabled && needs.config.outputs.has_anthropic == 'true' }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
     uses: suyash21101/.github/.github/workflows/claude-pr-review.yml@v1.1.1
     with:
       model: ${{ fromJSON(needs.config.outputs.cfg).stages.pr_review.model }}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  regression:
+    needs: config
+    if: ${{ fromJSON(needs.config.outputs.cfg).stages.regression.enabled && needs.config.outputs.has_anthropic == 'true' }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+    uses: suyash21101/.github/.github/workflows/claude-regression-check.yml@v1.1.1
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
@@ -135,6 +175,8 @@ jobs:
       - test
       - build
       - prisma_validate
+      - security_scan
+      - migration_safety
     if: always()
     runs-on: ubuntu-latest
     steps:
