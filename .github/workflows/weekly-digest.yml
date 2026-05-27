@@ -1,5 +1,6 @@
 # Weekly sprint digest posted to Slack on Sunday evenings.
 # Thin caller for the weekly-digest reusable module. Requires SLACK_WEBHOOK_URL on this repo.
+# The guard job skips the call when the webhook is absent, so it doesn't fail startup.
 # NOTE: schedule triggers only fire from the default branch (main).
 name: Weekly Sprint Digest
 
@@ -9,7 +10,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      has_webhook: ${{ steps.check.outputs.has_webhook }}
+    steps:
+      - id: check
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            echo "has_webhook=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_webhook=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::SLACK_WEBHOOK_URL not set — skipping weekly digest."
+          fi
+
   digest:
+    needs: guard
+    if: ${{ needs.guard.outputs.has_webhook == 'true' }}
     permissions:
       contents: read
       issues: read

@@ -1,5 +1,6 @@
 # Refresh the Graphify knowledge graph on merge to develop. Thin caller for the
 # knowledge-graph reusable module. Requires ANTHROPIC_API_KEY on this repo.
+# The guard job skips the call when the key is absent, so a missing key doesn't fail startup.
 name: Update Knowledge Graph
 
 on:
@@ -8,7 +9,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      has_anthropic: ${{ steps.check.outputs.has_anthropic }}
+    steps:
+      - id: check
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "has_anthropic=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_anthropic=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::ANTHROPIC_API_KEY not set — skipping knowledge graph update."
+          fi
+
   update:
+    needs: guard
+    if: ${{ needs.guard.outputs.has_anthropic == 'true' }}
     permissions:
       contents: write
     uses: suyash21101/.github/.github/workflows/knowledge-graph.yml@v1.1.0
