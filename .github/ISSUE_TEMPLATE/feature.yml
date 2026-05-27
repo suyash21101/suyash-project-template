@@ -31,7 +31,7 @@ body:
       label: Technical Notes
       description: Patterns to follow, libraries to use, constraints, relevant existing code.
       placeholder: |
-        - Use `@supabase/ssr` for server-side auth
+        - Use the Cognito server client for server-side auth
         - Follow component patterns in `src/components/`
         - Use Material Design 3 color tokens from `globals.css`
 
@@ -70,7 +70,7 @@ body:
     id: agent-compatible
     attributes:
       label: Can a Claude agent implement this independently?
-      description: "Yes" means the story has enough context for an agent to work without asking questions.
+      description: '"Yes" means the story has enough context for an agent to work without asking questions.'
       options:
         - "Yes — fully specified"
         - "Needs clarification first"

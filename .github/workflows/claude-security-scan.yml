@@ -25,20 +25,21 @@ jobs:
           model: sonnet
           timeout_minutes: 10
           prompt: |
-            You are a security engineer reviewing a PR for a Next.js 16 + Supabase application.
-            The app uses Supabase Auth with Row Level Security (RLS) policies.
+            You are a security engineer reviewing a PR for a Next.js 16 application on AWS.
+            The app uses Amazon Cognito for auth and Aurora PostgreSQL with Row Level Security
+            (RLS) policies driven by the request's user id (current_setting('app.user_id')).
 
             ## Scan For
 
             ### Injection
-            - SQL injection in raw Supabase queries or Prisma raw queries
+            - SQL injection in Prisma raw queries or hand-written SQL
             - XSS via dangerouslySetInnerHTML, unescaped user input in JSX, or unsanitized URL params
             - Command injection in any server-side code
             - SSRF in Server Components or API routes (user-controlled URLs in fetch calls)
 
             ### Authentication & Authorization
             - API routes or Server Actions missing auth checks
-            - Using the anon Supabase client where the service role client is needed (or vice versa)
+            - Trusting an unverified Cognito JWT, or not scoping the DB session to the user id
             - Missing or incorrect RLS policies for new database tables
             - Auth bypass via direct URL access to protected routes
             - Missing middleware checks for protected pages

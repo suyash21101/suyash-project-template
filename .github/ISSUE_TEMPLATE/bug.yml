@@ -37,7 +37,7 @@ body:
       description: Which files or components are involved? Include file paths.
       placeholder: |
         - Middleware: `src/middleware.ts`
-        - Auth check: `src/lib/supabase/middleware.ts`
+        - Auth check: relevant auth/session module
     validations:
       required: true
 
