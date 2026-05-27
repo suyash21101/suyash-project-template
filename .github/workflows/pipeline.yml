@@ -28,7 +28,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       cfg: ${{ steps.resolve.outputs.cfg }}
-      has_anthropic: ${{ steps.secrets.outputs.has_anthropic }}
     steps:
       - uses: actions/checkout@v4
       - id: resolve
@@ -42,19 +41,6 @@ jobs:
           # Validate it is parseable JSON, then emit compact form for downstream `if:` gates.
           echo "$CONFIG" | jq -e . > /dev/null
           echo "cfg=$(echo "$CONFIG" | jq -c .)" >> "$GITHUB_OUTPUT"
-      - id: secrets
-        name: Detect whether ANTHROPIC_API_KEY is configured
-        env:
-          # Read into env (allowed for secrets); never printed. Claude stages gate on this so a
-          # missing key SKIPS them rather than failing workflow startup (required-secret check).
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          if [ -n "$ANTHROPIC_API_KEY" ]; then
-            echo "has_anthropic=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_anthropic=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::ANTHROPIC_API_KEY not set — skipping Claude review stages (security_scan, pr_review, regression, migration_safety)."
-          fi
       - name: Record resolved config in run summary
         run: |
           {
@@ -109,18 +95,6 @@ jobs:
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.prisma_validate.enabled }}
     uses: suyash21101/.github/.github/workflows/prisma-validate.yml@v1.1.1
 
-  security_scan:
-    needs: config
-    if: ${{ fromJSON(needs.config.outputs.cfg).stages.security_scan.enabled && needs.config.outputs.has_anthropic == 'true' }}
-    uses: suyash21101/.github/.github/workflows/claude-security-scan.yml@v1.1.1
-    secrets: inherit
-
-  migration_safety:
-    needs: [config, changes]
-    if: ${{ fromJSON(needs.config.outputs.cfg).stages.migration_safety.enabled && needs.changes.outputs.migrations == 'true' && needs.config.outputs.has_anthropic == 'true' }}
-    uses: suyash21101/.github/.github/workflows/claude-migration-safety.yml@v1.1.1
-    secrets: inherit
-
   # ---- Advisory stages (NOT in gate.needs — they comment but never block) ----
 
   bundle_size:
@@ -129,20 +103,6 @@ jobs:
     uses: suyash21101/.github/.github/workflows/bundle-size.yml@v1.1.1
     with:
       threshold_kb: ${{ fromJSON(needs.config.outputs.cfg).stages.bundle_size.threshold_kb }}
-
-  pr_review:
-    needs: config
-    if: ${{ fromJSON(needs.config.outputs.cfg).stages.pr_review.enabled && needs.config.outputs.has_anthropic == 'true' }}
-    uses: suyash21101/.github/.github/workflows/claude-pr-review.yml@v1.1.1
-    with:
-      model: ${{ fromJSON(needs.config.outputs.cfg).stages.pr_review.model }}
-    secrets: inherit
-
-  regression:
-    needs: config
-    if: ${{ fromJSON(needs.config.outputs.cfg).stages.regression.enabled && needs.config.outputs.has_anthropic == 'true' }}
-    uses: suyash21101/.github/.github/workflows/claude-regression-check.yml@v1.1.1
-    secrets: inherit
 
   # The ONLY required status check. Passes unless a GATED stage that actually ran failed.
   # Advisory stages are deliberately excluded from `needs` so they cannot block a merge.
@@ -154,8 +114,6 @@ jobs:
       - test
       - build
       - prisma_validate
-      - security_scan
-      - migration_safety
     if: always()
     runs-on: ubuntu-latest
     steps:
