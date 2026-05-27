@@ -1,0 +1,16 @@
+# Flag stale PRs (3+ days no activity) and stuck issues on weekdays.
+# Thin caller for the stale-pr-check reusable module.
+# NOTE: schedule triggers only fire from the default branch (main).
+name: Stale PR Check
+
+on:
+  schedule:
+    - cron: "0 9 * * 1-5" # Weekdays, 09:00 UTC
+  workflow_dispatch:
+
+jobs:
+  stale:
+    permissions:
+      pull-requests: write
+      issues: write
+    uses: suyash21101/.github/.github/workflows/stale-pr-check.yml@v1.1.0

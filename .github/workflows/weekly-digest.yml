@@ -1,0 +1,18 @@
+# Weekly sprint digest posted to Slack on Sunday evenings.
+# Thin caller for the weekly-digest reusable module. Requires SLACK_WEBHOOK_URL on this repo.
+# NOTE: schedule triggers only fire from the default branch (main).
+name: Weekly Sprint Digest
+
+on:
+  schedule:
+    - cron: "0 18 * * 0" # Sundays, 18:00 UTC
+  workflow_dispatch:
+
+jobs:
+  digest:
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    uses: suyash21101/.github/.github/workflows/weekly-digest.yml@v1.1.0
+    secrets: inherit

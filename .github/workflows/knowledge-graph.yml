@@ -1,0 +1,15 @@
+# Refresh the Graphify knowledge graph on merge to develop. Thin caller for the
+# knowledge-graph reusable module. Requires ANTHROPIC_API_KEY on this repo.
+name: Update Knowledge Graph
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+jobs:
+  update:
+    permissions:
+      contents: write
+    uses: suyash21101/.github/.github/workflows/knowledge-graph.yml@v1.1.0
+    secrets: inherit
