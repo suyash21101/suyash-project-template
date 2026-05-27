@@ -4,8 +4,8 @@
 # (org default + optional repo override). Until that variable is set, this falls back to the
 # committed `pipeline.config.default.json`, so the pipeline works out of the box.
 #
-# Phase 1: stages run inline here. Phase 2 swaps each `run:` body for a reusable
-# `uses: suyashbhatia/.github/.github/workflows/<stage>.yml@v1` module.
+# Phase 2: each stage delegates to a reusable module in suyash21101/.github, pinned to @v1.
+# Stage bodies live there; this file only orchestrates (resolve config, gate on results).
 #
 # Branch protection should require ONLY the `gate` job — disabled stages skip, and `gate`
 # treats skipped jobs as pass, so turning a stage off never blocks a merge.
@@ -48,46 +48,24 @@ jobs:
   lint:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.lint.enabled }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "20", cache: "npm" }
-      - run: npm ci
-      - run: npm run lint
+    uses: suyash21101/.github/.github/workflows/lint.yml@v1
 
   typecheck:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.typecheck.enabled }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "20", cache: "npm" }
-      - run: npm ci
-      - run: npx tsc --noEmit
+    uses: suyash21101/.github/.github/workflows/typecheck.yml@v1
 
   test:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.test.enabled }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "20", cache: "npm" }
-      - run: npm ci
-      - run: npm run test:coverage
+    uses: suyash21101/.github/.github/workflows/test.yml@v1
+    with:
+      coverage_min: ${{ fromJSON(needs.config.outputs.cfg).stages.test.coverage_min }}
 
   build:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.build.enabled }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "20", cache: "npm" }
-      - run: npm ci
-      - run: npm run build
+    uses: suyash21101/.github/.github/workflows/build.yml@v1
 
   # The ONLY required status check. Passes unless a stage that actually ran reported failure.
   gate:

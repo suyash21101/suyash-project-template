@@ -20,7 +20,7 @@ roadmap with an integrations/access map.
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `PIPELINE_PLAYBOOK.md`              | Updated: §16 (2026 capabilities — agent teams, hooks, ultrareview, Codex QA, Dreaming), §17 (Modular Pipeline Control), §4 billing note |
 | `AWS_INFRA_SETUP.md`                | New: full AWS-native infra (Aurora + Cognito + S3, Amplify _and_ Fargate), CDK, OIDC, 16-step checklist                                 |
-| `GITHUB_DOTFILES_REPO_CHECKLIST.md` | New: build checklist for the `suyashbhatia/.github` reusable-workflows repo                                                             |
+| `GITHUB_DOTFILES_REPO_CHECKLIST.md` | New: build checklist for the `suyash21101/.github` reusable-workflows repo                                                              |
 | `BUILD_ROADMAP.md`                  | New: 6-phase build guide + control-plane design + integrations/access map                                                               |
 | `SAMPLE_SETUP_LOG.md`               | Running decision log (all locked decisions + open questions)                                                                            |
 | `CONVERSATION_SUMMARY.md`           | This file                                                                                                                               |

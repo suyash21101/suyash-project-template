@@ -29,7 +29,7 @@ setup steps once we run them. The pipeline reference itself lives in
 - **Dreaming = end-of-sprint memory maintenance** (2026-05-26). Periodic consolidation pass on the local memory store (merge dupes, drop stale/contradicted, surface patterns). Review output before trusting. Partially covers Archon semantic memory → pushes Archon adoption further out.
 - **Modular stage control** (2026-05-26). Control plane = reusable workflows (`workflow_call`) + repo/Org variable feature flags (`if: vars.ENABLE_X`), with path filters and per-PR skip labels. Each check becomes a versioned, independently-toggled module. **Documented in playbook §17 (2026-05-26)** — design only; module files not yet authored.
 - **Infra: full AWS-native** (2026-05-26). Aurora PostgreSQL + Cognito + S3, replacing Supabase. Documented in `docs/AWS_INFRA_SETUP.md`. Both compute options written (Amplify Hosting + ECS Fargate); pick one per project.
-- **Repo strategy: reusable workflows in user-level `.github` repo** (2026-05-26). Shared CI logic referenced by tag (`uses: suyashbhatia/.github/...@v1`); IaC lives in each project's `infra/` dir. No separate pipeline repo for now.
+- **Repo strategy: reusable workflows in user-level `.github` repo** (2026-05-26). Shared CI logic referenced by tag (`uses: suyash21101/.github/...@v1`); IaC lives in each project's `infra/` dir. No separate pipeline repo for now.
 - **Control plane: GitHub Variables + deployed UI, runtime-fetched** (2026-05-26, supersedes the earlier static-HTML/`pipeline.config.json` idea). Source of truth = a single GitHub Actions Variable `PIPELINE_CONFIG` (JSON), org-level default + repo override. A deployed thin SPA (Amplify/Pages + GitHub App auth) edits it via the REST API. Orchestrator `pipeline.yml` reads `vars.PIPELINE_CONFIG` **at runtime** (change toggles without a commit) and gates each stage on its `enabled` flag; a `record` job echoes the resolved config to the run summary for auditability. Single always-run `gate` job = only required branch-protection check. Full phased build guide: **`docs/BUILD_ROADMAP.md`**.
 
 ## Open questions
@@ -40,7 +40,7 @@ setup steps once we run them. The pipeline reference itself lives in
 - [ ] **RLS migration:** rewrite all Supabase `auth.uid()` policies to Postgres `current_setting('app.user_id')` — main porting cost from Supabase. See §5.
 - [ ] Agent-team subagent definitions: exact roles/tools/models (defer until we author them).
 - [ ] Author the actual `settings.json` hooks (branch-name, protected-path, stop) — not yet written, only specified.
-- [ ] Stand up the `suyashbhatia/.github` repo with reusable workflows (`aws-deploy.yml`, `ci.yml`, etc.). **Detailed checklist: `docs/GITHUB_DOTFILES_REPO_CHECKLIST.md`** (2026-05-26).
+- [x] Stand up the `suyash21101/.github` repo with reusable workflows. **Phase 2 thin slice done (2026-05-27):** repo created (private), 4 modules live at `@v1`, pipeline.yml rewired. Remaining ~12 modules + `aws-deploy.yml` deferred. **Checklist: `docs/GITHUB_DOTFILES_REPO_CHECKLIST.md`**.
 - [ ] First real bootstrap: create a repo from the template + run `setup-project.sh` (deferred, "in some time").
 - [ ] **Integrations & access** documented in `BUILD_ROADMAP.md` (2026-05-26): GitHub App for the control UI, OIDC for CI→AWS, AWS SSO + optional AWS MCP for local agents, GitHub Environments with prod reviewer, MCP servers, Budgets/alarms, Dependabot. Agent AWS rule: read-all + write-INT-only, never autonomous prod write.
 - [ ] Conversation summary + full question list captured in `docs/CONVERSATION_SUMMARY.md` (2026-05-26).
@@ -113,4 +113,21 @@ Known issues / not done:
 - UI auth is a PAT prototype — production needs the GitHub App + serverless backend.
 - Org-level `PIPELINE_CONFIG` variable not seeded (outward GitHub mutation — left for the user): `gh variable set PIPELINE_CONFIG --org <org> --body "$(cat pipeline.config.default.json)"`.
 - `tsconfig.json` auto-modified by `next build` (added `.next` types, jsx=react-jsx) — expected Next behavior.
-- Nothing committed yet.
+
+### Phase 2 — reusable workflow modules (2026-05-27)
+
+Decisions (confirmed): owner **`suyash21101`** (same account as consumer repos — required for `uses:`/`secrets: inherit`); repo **private**; **thin-slice-first** sequencing.
+
+Done:
+
+- Created `suyash21101/.github` (private). Enabled cross-repo Actions access (`actions/permissions/access` = `user`) so consumer repos can reference the private modules.
+- Authored 4 `workflow_call` modules in `suyash21101/.github/.github/workflows/`: `lint.yml`, `typecheck.yml`, `test.yml` (takes `coverage_min`, overrides the consumer's vitest thresholds so `PIPELINE_CONFIG` governs the gate), `build.yml`. Pushed `main` + tags `v1.0.0` and moving `v1`.
+- Rewired this repo's `.github/workflows/pipeline.yml`: the 4 stage jobs now `uses:` the modules `@v1`; `config` + `gate` jobs unchanged (skip-is-pass / fail-is-block contract preserved at the job level).
+- Cleanup: corrected `suyashbhatia/.github` → `suyash21101/.github` across docs; `pipeline.schema.json` `$id`; CODEOWNERS handle `@suyashbhatia` → `@suyash21101`.
+
+Notes / not done:
+
+- Personal accounts have no org-level secrets — `secrets: inherit` forwards the **consumer** repo's secrets. The Claude modules (Stage F) will need `ANTHROPIC_API_KEY` set on each consumer repo (or via an environment).
+- CODEOWNERS still references Supabase paths — valid for the current template; revisit at the AWS migration (Phase 4), not now.
+- Remaining ~12 modules (prisma-validate, bundle-size, claude-\*, dependency-audit, stale-pr-check, knowledge-graph, weekly-digest, aws-deploy) deferred until the slice is verified green on a real PR.
+- Smoke test (Stage E) pending: needs a PR run to confirm the modules resolve via `@v1` and `gate` behaves.

@@ -84,7 +84,7 @@ jobs:
 
   test:
     if: ${{ fromJSON(vars.PIPELINE_CONFIG).stages.test.enabled }}
-    uses: suyashbhatia/.github/.github/workflows/test.yml@v1
+    uses: suyash21101/.github/.github/workflows/test.yml@v1
     with:
       coverage_min: ${{ fromJSON(vars.PIPELINE_CONFIG).stages.test.coverage_min }}
 
@@ -181,14 +181,14 @@ Two separate paths — keep them distinct:
 - [ ] Add the `record` + `gate` jobs and the per-stage `if: fromJSON(vars.PIPELINE_CONFIG)...` gating to `pipeline.yml`.
 - [ ] Add the convention + coverage rule: `CLAUDE.md` Conventions line + `vitest.config.ts` `coverage.thresholds`.
 
-## Phase 2 — Reusable modules in `suyashbhatia/.github`
+## Phase 2 — Reusable modules in `suyash21101/.github`
 
 Follow `GITHUB_DOTFILES_REPO_CHECKLIST.md` end to end:
 
 - [ ] Create the `.github` repo; author one `workflow_call` module per stage.
 - [ ] Tag `v1` (moving major tag).
 - [ ] Set account-level secrets (`ANTHROPIC_API_KEY`, `SLACK_WEBHOOK_URL`).
-- [ ] Point the template's `pipeline.yml` jobs to `uses: suyashbhatia/.github/...@v1`.
+- [ ] Point the template's `pipeline.yml` jobs to `uses: suyash21101/.github/...@v1`.
 - [ ] Smoke-test from a throwaway repo: secrets inherit, a disabled stage skips, `gate` passes, the UI flips a toggle and the next run honors it.
 
 ## Phase 3 — First real project bootstrap
@@ -230,7 +230,7 @@ Follow `AWS_INFRA_SETUP.md` §16 checklist:
 | Config timing           | **runtime-fetched**                              | change toggles without a commit, instant            | need strict reproducibility → git-tracked file + UI commits                              |
 | Control UI hosting      | static SPA on Amplify (or Pages) + GitHub App    | matches AWS direction, scoped auth, no token sprawl | solo prototype → OAuth flow or fine-grained PAT                                          |
 | Required check strategy | single `gate` aggregator job                     | disable any stage without blocking merges           | prefer each check individually required                                                  |
-| Module hosting          | `suyashbhatia/.github` reusable workflows        | central, versioned, idiomatic                       | multi-project shared infra → dedicated pipeline repo                                     |
+| Module hosting          | `suyash21101/.github` reusable workflows         | central, versioned, idiomatic                       | multi-project shared infra → dedicated pipeline repo                                     |
 
 ---
 

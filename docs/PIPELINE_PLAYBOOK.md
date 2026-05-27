@@ -1845,11 +1845,11 @@ path filter (1), with a label (3) as the manual escape hatch.
 
 ### 17.2 Reusable modules + orchestrator
 
-Each stage becomes a reusable workflow living in the user-level **`suyashbhatia/.github`** repo
+Each stage becomes a reusable workflow living in the user-level **`suyash21101/.github`** repo
 (per §1 repo strategy), exposing typed `inputs`:
 
 ```yaml
-# suyashbhatia/.github/.github/workflows/test.yml  (the module)
+# suyash21101/.github/.github/workflows/test.yml  (the module)
 on:
   workflow_call:
     inputs:
@@ -1870,19 +1870,19 @@ A single orchestrator in each project repo composes the modules and applies the 
 # <project>/.github/workflows/pipeline.yml  (the composer)
 on: { pull_request: { types: [opened, synchronize] } }
 jobs:
-  lint: { uses: suyashbhatia/.github/.github/workflows/lint.yml@v1 }
+  lint: { uses: suyash21101/.github/.github/workflows/lint.yml@v1 }
   test:
-    uses: suyashbhatia/.github/.github/workflows/test.yml@v1
+    uses: suyash21101/.github/.github/workflows/test.yml@v1
     with:
       enabled: ${{ vars.ENABLE_TESTS != 'false' }}
       coverage_min: 80
   security:
     if: ${{ vars.ENABLE_SECURITY_SCAN == 'true' }}
-    uses: suyashbhatia/.github/.github/workflows/claude-security-scan.yml@v1
+    uses: suyash21101/.github/.github/workflows/claude-security-scan.yml@v1
     secrets: inherit
   e2e:
     if: ${{ github.base_ref == 'staging' && !contains(github.event.pull_request.labels.*.name, 'skip-e2e') }}
-    uses: suyashbhatia/.github/.github/workflows/e2e.yml@v1
+    uses: suyash21101/.github/.github/workflows/e2e.yml@v1
 ```
 
 This is the whole point: **add a stage = add a `uses:` line; disable a stage = flip a variable;
@@ -1900,7 +1900,7 @@ Make a stage advisory by simply not listing its check name in the branch's `requ
 
 ### 17.4 Migration path (current → modular)
 
-1. Stand up `suyashbhatia/.github` with one reusable workflow per existing stage (lift the current
+1. Stand up `suyash21101/.github` with one reusable workflow per existing stage (lift the current
    `ci.yml`, `claude-*.yml` bodies into `workflow_call` modules).
 2. Replace each project's standalone workflows with a single `pipeline.yml` orchestrator that
    `uses:` the modules.

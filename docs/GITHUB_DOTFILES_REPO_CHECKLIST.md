@@ -1,17 +1,17 @@
 # `.github` Repo Setup Checklist
 
-> Build checklist for the user-level **`suyashbhatia/.github`** repo — the central home for
+> Build checklist for the user-level **`suyash21101/.github`** repo — the central home for
 > reusable workflows (the modular pipeline modules from `PIPELINE_PLAYBOOK.md` §17) plus optional
 > default community-health files shared across all your repos.
 >
 > This is the artifact referenced by the open item in `SAMPLE_SETUP_LOG.md`. Do this once; every
-> project then references the modules by tag (`uses: suyashbhatia/.github/...@v1`).
+> project then references the modules by tag (`uses: suyash21101/.github/...@v1`).
 
 ---
 
 ## A. Repo creation & basics
 
-- [ ] Create the repo named exactly **`.github`** under your account: `gh repo create suyashbhatia/.github --public`
+- [ ] Create the repo named exactly **`.github`** under your account: `gh repo create suyash21101/.github --private`
   - Name must be literally `.github` for the profile-README + default-health-file behavior.
   - **Public** is simplest for reusable-workflow sharing. Private works but requires the access toggle in §F.
 - [ ] Add a top-level `README.md` describing the repo's purpose (this is _not_ the profile README).
@@ -122,7 +122,7 @@ It's now load-bearing for every project — protect it:
 
 ## J. Validation / smoke test
 
-- [ ] From a throwaway test repo, reference one module (`uses: suyashbhatia/.github/.github/workflows/lint.yml@v1`) and confirm it runs.
+- [ ] From a throwaway test repo, reference one module (`uses: suyash21101/.github/.github/workflows/lint.yml@v1`) and confirm it runs.
 - [ ] Verify `secrets: inherit` forwards `ANTHROPIC_API_KEY` to a Claude module.
 - [ ] Verify a variable flag (`ENABLE_TESTS=false`) actually skips the test job.
 - [ ] Verify the moving `@v1` tag picks up a new release without consumers changing their ref.

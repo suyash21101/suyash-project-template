@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://suyashbhatia/pipeline.schema.json",
+  "$id": "https://suyash21101/pipeline.schema.json",
   "title": "PIPELINE_CONFIG",
   "description": "Runtime control-plane config for the modular pipeline. Stored as the GitHub Actions variable PIPELINE_CONFIG (org default + optional repo override) and read by .github/workflows/pipeline.yml.",
   "type": "object",

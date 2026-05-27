@@ -235,13 +235,13 @@ infra/
 
 ## 11. CI/CD Integration
 
-Shared logic lives as **reusable workflows in `suyashbhatia/.github`**, referenced by tag:
+Shared logic lives as **reusable workflows in `suyash21101/.github`**, referenced by tag:
 
 ```yaml
 # in a project repo: .github/workflows/deploy.yml
 jobs:
   deploy:
-    uses: suyashbhatia/.github/.github/workflows/aws-deploy.yml@v1
+    uses: suyash21101/.github/.github/workflows/aws-deploy.yml@v1
     with:
       environment: ${{ github.ref_name }} # develop|staging|main
       compute_mode: fargate # or amplify
@@ -328,7 +328,7 @@ Order of operations for a new project on AWS:
 8. [ ] Deploy storage stack (S3 + CloudFront).
 9. [ ] Deploy compute stack — Amplify (§7) **or** Fargate (§8).
 10. [ ] Configure Route 53 + ACM + CloudFront + WAF (§12).
-11. [ ] Wire CI: reference `suyashbhatia/.github` reusable `aws-deploy.yml`; set `compute_mode`.
+11. [ ] Wire CI: reference `suyash21101/.github` reusable `aws-deploy.yml`; set `compute_mode`.
 12. [ ] Set secrets in Secrets Manager / SSM; populate per-branch config.
 13. [ ] Promote schema INT → UAT → PROD (§14).
 14. [ ] Set CloudWatch alarms + AWS Budgets → Slack.

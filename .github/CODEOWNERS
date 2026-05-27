@@ -1,15 +1,17 @@
 # Default owner for everything
-* @suyashbhatia
+* @suyash21101
 
 # Auth and security-sensitive code — always require review
-src/middleware.ts @suyashbhatia
-src/lib/supabase/ @suyashbhatia
-src/app/auth/ @suyashbhatia
-src/lib/session.ts @suyashbhatia
+# NOTE: the supabase/auth/session paths reflect the current Supabase template; revisit when
+# the AWS-native migration (Cognito/Aurora clients) lands — see docs/AWS_INFRA_SETUP.md.
+src/middleware.ts @suyash21101
+src/lib/supabase/ @suyash21101
+src/app/auth/ @suyash21101
+src/lib/session.ts @suyash21101
 
 # Database schema changes — always require review
-prisma/ @suyashbhatia
-sql/ @suyashbhatia
+prisma/ @suyash21101
+sql/ @suyash21101
 
 # CI/CD pipeline changes — always require review
-.github/ @suyashbhatia
+.github/ @suyash21101
