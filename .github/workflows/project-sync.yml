@@ -1,0 +1,48 @@
+# Ties the Sprint Board (Project #1) Status column to the dev/CI lifecycle.
+#
+#   PR opened / reopened ........ In Progress
+#   PR ready for review ......... In Review
+#   Pipeline `gate` fails ....... Blocked       (advisory-stage failures are ignored)
+#   Pipeline `gate` passes ...... un-blocks (Blocked -> In Review)
+#
+# PR merged / issue closed -> Done is handled by the project's built-in workflows.
+#
+# Requires a repo/org secret PROJECTS_TOKEN: a PAT with `repo` + `project` scope (the default
+# GITHUB_TOKEN cannot write a user-owned Project). The job no-ops safely when it's absent,
+# so this never breaks a build. Logic lives in .github/scripts/project_sync.py.
+name: Project Sync
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, converted_to_draft]
+  workflow_run:
+    workflows: ["Pipeline"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+# One in-flight sync per PR/run; newer events supersede older ones.
+concurrency:
+  group: project-sync-${{ github.event.pull_request.number || github.event.workflow_run.id }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Sync board Status
+        env:
+          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          PROJECT_OWNER: suyash21101
+          PROJECT_NUMBER: "1"
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::PROJECTS_TOKEN not set — skipping board sync (no-op)."
+            exit 0
+          fi
+          python .github/scripts/project_sync.py
