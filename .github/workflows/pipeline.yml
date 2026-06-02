@@ -4,7 +4,7 @@
 # (org default + optional repo override). Until that variable is set, this falls back to the
 # committed `pipeline.config.default.json`, so the pipeline works out of the box.
 #
-# Each stage delegates to a reusable module in suyash21101/.github, pinned to @v1.1.1.
+# Each stage delegates to a reusable module in suyash21101/.github, pinned to @v1.2.0.
 # Stage bodies live there; this file only orchestrates (resolve config, detect changes, gate).
 #
 # Gated vs advisory (PIPELINE_PLAYBOOK §17.3):
@@ -75,37 +75,36 @@ jobs:
           filters: |
             migrations:
               - 'sql/**'
-              - 'prisma/schema.prisma'
-              - 'prisma/migrations/**'
+              - '**/migrations/**'
 
   # ---- Gated stages (listed in gate.needs) ----
 
   lint:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.lint.enabled }}
-    uses: suyash21101/.github/.github/workflows/lint.yml@v1.1.1
+    uses: suyash21101/.github/.github/workflows/lint.yml@v1.2.0
 
   typecheck:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.typecheck.enabled }}
-    uses: suyash21101/.github/.github/workflows/typecheck.yml@v1.1.1
+    uses: suyash21101/.github/.github/workflows/typecheck.yml@v1.2.0
 
   test:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.test.enabled }}
-    uses: suyash21101/.github/.github/workflows/test.yml@v1.1.1
+    uses: suyash21101/.github/.github/workflows/test.yml@v1.2.0
     with:
       coverage_min: ${{ fromJSON(needs.config.outputs.cfg).stages.test.coverage_min }}
 
   build:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.build.enabled }}
-    uses: suyash21101/.github/.github/workflows/build.yml@v1.1.1
+    uses: suyash21101/.github/.github/workflows/build.yml@v1.2.0
 
   prisma_validate:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.prisma_validate.enabled }}
-    uses: suyash21101/.github/.github/workflows/prisma-validate.yml@v1.1.1
+    uses: suyash21101/.github/.github/workflows/prisma-validate.yml@v1.2.0
 
   # Claude stages request pull-requests:write to comment. The repo's default workflow token is
   # read-only, and a called reusable workflow cannot escalate beyond the caller job's token —
@@ -117,7 +116,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: read
-    uses: suyash21101/.github/.github/workflows/claude-security-scan.yml@v1.1.1
+    uses: suyash21101/.github/.github/workflows/claude-security-scan.yml@v1.2.0
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
@@ -128,7 +127,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: read
-    uses: suyash21101/.github/.github/workflows/claude-migration-safety.yml@v1.1.1
+    uses: suyash21101/.github/.github/workflows/claude-migration-safety.yml@v1.2.0
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
@@ -137,7 +136,7 @@ jobs:
   bundle_size:
     needs: config
     if: ${{ fromJSON(needs.config.outputs.cfg).stages.bundle_size.enabled }}
-    uses: suyash21101/.github/.github/workflows/bundle-size.yml@v1.1.1
+    uses: suyash21101/.github/.github/workflows/bundle-size.yml@v1.2.0
     with:
       threshold_kb: ${{ fromJSON(needs.config.outputs.cfg).stages.bundle_size.threshold_kb }}
 
@@ -148,7 +147,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: read
-    uses: suyash21101/.github/.github/workflows/claude-pr-review.yml@v1.1.1
+    uses: suyash21101/.github/.github/workflows/claude-pr-review.yml@v1.2.0
     with:
       model: ${{ fromJSON(needs.config.outputs.cfg).stages.pr_review.model }}
     secrets:
@@ -161,7 +160,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: read
-    uses: suyash21101/.github/.github/workflows/claude-regression-check.yml@v1.1.1
+    uses: suyash21101/.github/.github/workflows/claude-regression-check.yml@v1.2.0
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
