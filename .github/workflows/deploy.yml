@@ -1,0 +1,121 @@
+# Reference deploy caller for the v1.2.0 CD plane. INERT by default: the guard job short-circuits
+# unless repo variable DEPLOY_ENABLED == "true", so this never runs (or fails) until an AWS target
+# exists. Copy/adapt into the real app repo (quantlab-wealth) and fill cluster/service/repo names.
+#
+# Activate in a consumer repo: set repo variable DEPLOY_ENABLED=true plus the AWS_* vars referenced.
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [int, uat, prod]
+        default: int
+  push:
+    branches: [develop, staging, main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.g.outputs.enabled }}
+      env: ${{ steps.g.outputs.env }}
+    steps:
+      - id: g
+        env:
+          DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
+          INPUT_ENV: ${{ github.event.inputs.environment }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$DEPLOY_ENABLED" != "true" ]; then
+            echo "DEPLOY_ENABLED is not 'true' — deploy is intentionally inert."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+          ENV="$INPUT_ENV"
+          if [ -z "$ENV" ]; then
+            case "$REF_NAME" in
+              develop) ENV=int ;;
+              staging) ENV=uat ;;
+              main)    ENV=prod ;;
+              *)       ENV=int ;;
+            esac
+          fi
+          echo "env=$ENV" >> "$GITHUB_OUTPUT"
+
+  build_web:
+    needs: guard
+    if: ${{ needs.guard.outputs.enabled == 'true' }}
+    uses: suyash21101/.github/.github/workflows/docker-build-push.yml@v1.2.0
+    with:
+      environment: ${{ needs.guard.outputs.env }}
+      aws_region: ap-south-1
+      role_to_assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      ecr_repository: quantlab/web
+      dockerfile: Dockerfile
+      build_context: .
+
+  build_scalping:
+    needs: guard
+    if: ${{ needs.guard.outputs.enabled == 'true' }}
+    uses: suyash21101/.github/.github/workflows/docker-build-push.yml@v1.2.0
+    with:
+      environment: ${{ needs.guard.outputs.env }}
+      aws_region: ap-south-1
+      role_to_assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      ecr_repository: quantlab/scalping
+      dockerfile: scalping-engine/Dockerfile
+      build_context: scalping-engine
+
+  deploy_web:
+    needs: [guard, build_web]
+    if: ${{ needs.guard.outputs.enabled == 'true' }}
+    uses: suyash21101/.github/.github/workflows/aws-deploy.yml@v1.2.0
+    with:
+      environment: ${{ needs.guard.outputs.env }}
+      aws_region: ap-south-1
+      role_to_assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      mode: fargate
+      cluster: quantlab-${{ needs.guard.outputs.env }}
+      service: django-web
+      container: web
+      image: ${{ needs.build_web.outputs.image_uri }}
+      migrate: true
+      subnets: ${{ vars.AWS_PRIVATE_SUBNETS }}
+      security_groups: ${{ vars.AWS_APP_SG }}
+
+  deploy_worker:
+    needs: [guard, build_web, deploy_web]
+    if: ${{ needs.guard.outputs.enabled == 'true' }}
+    uses: suyash21101/.github/.github/workflows/aws-deploy.yml@v1.2.0
+    with:
+      environment: ${{ needs.guard.outputs.env }}
+      aws_region: ap-south-1
+      role_to_assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      mode: fargate
+      cluster: quantlab-${{ needs.guard.outputs.env }}
+      service: celery-worker
+      container: web
+      image: ${{ needs.build_web.outputs.image_uri }}
+      migrate: false
+
+  deploy_scalping:
+    needs: [guard, build_scalping, deploy_web]
+    if: ${{ needs.guard.outputs.enabled == 'true' }}
+    uses: suyash21101/.github/.github/workflows/aws-deploy.yml@v1.2.0
+    with:
+      environment: ${{ needs.guard.outputs.env }}
+      aws_region: ap-south-1
+      role_to_assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      mode: fargate-leader
+      cluster: quantlab-${{ needs.guard.outputs.env }}
+      service: scalping
+      container: scalping
+      image: ${{ needs.build_scalping.outputs.image_uri }}
