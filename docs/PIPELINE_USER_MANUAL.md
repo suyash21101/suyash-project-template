@@ -56,22 +56,30 @@ turning stages on/off never breaks the merge button. Merge when `gate` is green.
 
 ### What runs on every PR
 
-| Stage                | Type     | Status | What it does                                                                           |
-| -------------------- | -------- | ------ | -------------------------------------------------------------------------------------- |
-| **lint**             | gated    | on     | ESLint / formatting                                                                    |
-| **typecheck**        | gated    | on     | TypeScript types                                                                       |
-| **test**             | gated    | on     | Vitest, **coverage floor 80%** (frontend only — Python has no CI tests yet, known gap) |
-| **build**            | gated    | on     | Production build must succeed                                                          |
-| **security_scan**    | gated    | on\*   | Claude scans the diff for vulns; blocks on `critical`                                  |
-| **migration_safety** | gated    | on\*   | Claude reviews DB migrations — **only runs if `sql/**`or`**/migrations/**` changed\*\* |
-| **prisma_validate**  | gated    | off    | Disabled (wrong stack — we are Django, not Prisma)                                     |
-| **pr_review**        | advisory | off    | Claude code review (comments, never blocks)                                            |
-| **regression**       | advisory | off    | Claude regression hunt                                                                 |
-| **bundle_size**      | advisory | off    | Frontend bundle budget                                                                 |
+| Stage                | Type     | Status | What it does                                                                                     |
+| -------------------- | -------- | ------ | ------------------------------------------------------------------------------------------------ |
+| **lint**             | gated    | on     | ESLint / formatting                                                                              |
+| **typecheck**        | gated    | on     | TypeScript types                                                                                 |
+| **test**             | gated    | on     | Vitest, **coverage floor 80%** (frontend only — Python has no CI tests yet, known gap)           |
+| **build**            | gated    | on     | Production build must succeed                                                                    |
+| **security_scan**    | gated    | off†   | Claude scans the diff for vulns; blocks on `critical`. **Temporarily disabled** — see note below |
+| **migration_safety** | gated    | on\*†  | Claude reviews DB migrations — only runs if `sql/**` or `**/migrations/**` changed               |
+| **prisma_validate**  | gated    | off    | Disabled (wrong stack — we are Django, not Prisma)                                               |
+| **pr_review**        | advisory | off    | Claude code review (comments, never blocks)                                                      |
+| **regression**       | advisory | off    | Claude regression hunt                                                                           |
+| **bundle_size**      | advisory | off    | Frontend bundle budget                                                                           |
 
 `*` The Claude stages need Claude auth to run. It is configured via a `CLAUDE_CODE_OAUTH_TOKEN`
 secret (Claude subscription, no per-API bill). If the token is absent, those stages skip
 cleanly instead of failing.
+
+`†` **Known issue (2026-06-03):** `claude-code-action@v1` needs `id-token: write` permission
+(or a passed `github_token`), which the Claude module jobs don't currently grant — so once
+Claude auth is configured, these stages fail with _"Could not fetch an OIDC token."_ Because
+`security_scan` is gated and runs on every PR, that failure blocks the gate. It is therefore
+**disabled** until the modules are patched (add `id-token: write` + `github_token`, release
+`v1.3.1`, re-enable). `migration_safety` has the same bug but is path-filtered, so it only
+bites on migration PRs.
 
 **Gated vs advisory:** gated stages can _block_ a merge (they feed `gate`). Advisory stages
 run and leave comments but **never block** — they are deliberately excluded from `gate`.
