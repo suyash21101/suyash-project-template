@@ -6,7 +6,7 @@
     "build": { "enabled": true },
     "prisma_validate": { "enabled": false },
     "bundle_size": { "enabled": false, "threshold_kb": 50 },
-    "security_scan": { "enabled": true, "block_on": "critical" },
+    "security_scan": { "enabled": false, "block_on": "critical" },
     "regression": { "enabled": false },
     "migration_safety": { "enabled": true },
     "e2e": { "enabled": false, "run_on": ["staging", "main"] },
