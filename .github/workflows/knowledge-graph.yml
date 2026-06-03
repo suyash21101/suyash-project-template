@@ -17,12 +17,13 @@ jobs:
       - id: check
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
-          if [ -n "$ANTHROPIC_API_KEY" ]; then
+          if [ -n "$ANTHROPIC_API_KEY" ] || [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
             echo "has_anthropic=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_anthropic=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::ANTHROPIC_API_KEY not set — skipping knowledge graph update."
+            echo "::warning::No Claude auth (ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN) — skipping knowledge graph update."
           fi
 
   update:
@@ -30,5 +31,5 @@ jobs:
     if: ${{ needs.guard.outputs.has_anthropic == 'true' }}
     permissions:
       contents: write
-    uses: suyash21101/.github/.github/workflows/knowledge-graph.yml@v1.1.1
+    uses: suyash21101/.github/.github/workflows/knowledge-graph.yml@v1.3.0
     secrets: inherit
