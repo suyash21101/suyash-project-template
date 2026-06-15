@@ -65,8 +65,14 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   # Detect whether migration/schema files changed, so migration-safety only runs when relevant.
+  # paths-filter reads the PR file list via the API; under a restricted default workflow token
+  # (org repos commonly) the job must request pull-requests:read or it fails
+  # "Resource not accessible by integration".
   changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       migrations: ${{ steps.filter.outputs.migrations }}
     steps:
@@ -175,6 +181,7 @@ jobs:
   gate:
     needs:
       - config
+      - changes
       - lint
       - typecheck
       - test
