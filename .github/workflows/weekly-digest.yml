@@ -1,7 +1,7 @@
 # Weekly sprint digest posted to Slack on Sunday evenings.
 # Thin caller for the weekly-digest reusable module. Requires SLACK_WEBHOOK_URL on this repo.
 # The guard job skips the call when the webhook is absent, so it doesn't fail startup.
-# NOTE: schedule triggers only fire from the default branch (main).
+# NOTE: schedule triggers only fire from the default branch (develop).
 name: Weekly Sprint Digest
 
 on:

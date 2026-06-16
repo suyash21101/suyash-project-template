@@ -45,9 +45,8 @@ src/
 
 | Env  | Branch    | Database              |
 | ---- | --------- | --------------------- |
-| INT  | `develop` | <!-- project-int -->  |
-| UAT  | `staging` | <!-- project-uat -->  |
-| PROD | `main`    | <!-- project-prod --> |
+| UAT  | `develop` | <!-- project-uat -->  |
+| PROD | `master`  | <!-- project-prod --> |
 
 ## Design Reference
 
@@ -64,7 +63,8 @@ A Graphify knowledge graph is maintained at `graphify-out/`.
 
 ## Git Workflow
 
-- Never commit directly to `main`, `staging`, or `develop`
+- Never commit directly to `master` or `develop`
 - Create feature branches: `feature/<issue-number>-<short-description>`
 - PRs are reviewed by Claude PR Reviewer and Claude Security Scanner
-- Flow: feature branch → develop → staging → main
+- Flow: feature branch → `develop` (UAT) → `master` (PROD)
+- Merge to `develop` while working; promote `develop → master` (via PR) on a prod release
