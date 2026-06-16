@@ -11,10 +11,10 @@ on:
       environment:
         description: Target environment
         type: choice
-        options: [int, uat, prod]
-        default: int
+        options: [uat, prod]
+        default: uat
   push:
-    branches: [develop, staging, main]
+    branches: [develop, master]
 
 permissions:
   id-token: write
@@ -42,10 +42,9 @@ jobs:
           ENV="$INPUT_ENV"
           if [ -z "$ENV" ]; then
             case "$REF_NAME" in
-              develop) ENV=int ;;
-              staging) ENV=uat ;;
-              main)    ENV=prod ;;
-              *)       ENV=int ;;
+              develop) ENV=uat ;;
+              master)  ENV=prod ;;
+              *)       ENV=uat ;;
             esac
           fi
           echo "env=$ENV" >> "$GITHUB_OUTPUT"
