@@ -1,6 +1,6 @@
 # Weekly dependency audit (npm audit + outdated; opens an issue on vulnerabilities).
 # Thin caller for the dependency-audit reusable module.
-# NOTE: schedule triggers only fire from the default branch (main).
+# NOTE: schedule triggers only fire from the default branch (develop).
 name: Dependency Audit
 
 on:
